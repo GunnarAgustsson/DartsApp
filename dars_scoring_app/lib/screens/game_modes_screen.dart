@@ -1,0 +1,104 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'traditional_game_screen.dart';
+
+class GameModeScreen extends StatelessWidget {
+  const GameModeScreen({super.key});
+
+  Future<List<String>> _getPlayers() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('players') ?? [];
+  }
+
+  Future<List<String>?> _showPlayerSelectionDialog(BuildContext context) async {
+    final players = await _getPlayers();
+    final selected = <String>{};
+
+    return showDialog<List<String>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Select Players (max 8)'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: players.length,
+                itemBuilder: (context, index) {
+                  final player = players[index];
+                  final isSelected = selected.contains(player);
+                  return CheckboxListTile(
+                    title: Text(player),
+                    value: isSelected,
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked == true && selected.length < 8) {
+                          selected.add(player);
+                        } else {
+                          selected.remove(player);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selected.isNotEmpty
+                    ? () => Navigator.of(context).pop(selected.toList())
+                    : null,
+                child: const Text('Start Game'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _onGameModeSelected(BuildContext context, int startingScore) async {
+    final selectedPlayers = await _showPlayerSelectionDialog(context);
+    if (selectedPlayers != null && selectedPlayers.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GameScreen(
+            startingScore: startingScore,
+            players: selectedPlayers,
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select Game Mode'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () => _onGameModeSelected(context, 501),
+              child: const Text('501'),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => _onGameModeSelected(context, 301),
+              child: const Text('301'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
