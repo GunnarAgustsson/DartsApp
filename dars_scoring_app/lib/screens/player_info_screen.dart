@@ -61,11 +61,14 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
       }
     }
 
-    // For heatmap, avg, and other stats, only last 8 games
+    // Only completed games for stats and last 8 games
     int gamesCounted = 0;
     for (final g in games.reversed) {
       final game = jsonDecode(g);
       if (!(game['players'] as List).contains(widget.playerName)) continue;
+      final completed = game['completedAt'] != null;
+      if (!completed) continue; // Only completed games
+
       final throws = (game['throws'] as List)
           .where((t) => t['player'] == widget.playerName)
           .toList();
@@ -81,35 +84,24 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
         finishedLegs++;
       }
 
-      // Most hit number
-      final completed = game['completedAt'] != null;
-      if (completed) {
-        for (final t in throws) {
-          if (t['wasBust'] == true) continue;
-          allScores.add((t['value'] ?? 0) * (t['multiplier'] ?? 1));
-          int value = t['value'] ?? 0;
-          heatmap[value] = (heatmap[value] ?? 0) + 1;
-          hitCount[value] = (hitCount[value] ?? 0) + 1;
-        }
-      } else {
-        // Still count for heatmap and hitCount, but not for allScores/avg
-        for (final t in throws) {
-          if (t['wasBust'] == true) continue;
-          int value = t['value'] ?? 0;
-          heatmap[value] = (heatmap[value] ?? 0) + 1;
-          hitCount[value] = (hitCount[value] ?? 0) + 1;
-        }
+      // Most hit number, heatmap, avg, etc.
+      for (final t in throws) {
+        if (t['wasBust'] == true) continue;
+        allScores.add((t['value'] ?? 0) * (t['multiplier'] ?? 1));
+        int value = t['value'] ?? 0;
+        heatmap[value] = (heatmap[value] ?? 0) + 1;
+        hitCount[value] = (hitCount[value] ?? 0) + 1;
       }
 
       // Recent results (win/loss)
       final winner = game['winner'];
-      if (completed && winner != null) {
+      if (winner != null) {
         lastResults.add(winner == widget.playerName);
       }
 
       playerGames.add(game);
       gamesCounted++;
-      if (gamesCounted == 8) break;
+      if (gamesCounted == 8) break; // Only last 8 completed games
     }
 
     // Most hit number
@@ -218,93 +210,97 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final scale = width / 390; // 390 is a typical mobile width
+
     final filteredHeatmap = _filteredHeatmap(_selectedFilter);
     final maxHits = filteredHeatmap.values.isEmpty ? 1 : filteredHeatmap.values.reduce((a, b) => a > b ? a : b);
 
     return Scaffold(
       appBar: AppBar(title: Text('${widget.playerName} Stats')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16 * scale),
         child: ListView(
           children: [
             Text(
               'Overall Average (last 8 games): ${avgScore.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12 * scale),
             Text(
               'Win Rate: ${winRate.toStringAsFixed(1)}% ($totalWins/$totalGamesPlayed)',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12 * scale),
             Text(
               'Highest Checkout: ${highestCheckout.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16 * scale),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8 * scale),
             Text(
               'Best Leg (Fewest Darts): $bestLegDarts',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16 * scale),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8 * scale),
             Text(
               'Average Darts per Leg: ${avgDartsPerLeg.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16 * scale),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8 * scale),
             Text(
               'Most Hit Number: $mostHitNumber ($mostHitCount times)',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16 * scale),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8 * scale),
             Row(
               children: [
-                const Text('Recent Form: ', style: TextStyle(fontSize: 16)),
+                Text('Recent Form: ', style: TextStyle(fontSize: 16 * scale)),
                 ...recentResults.take(5).map((win) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 2 * scale),
                   child: Icon(
                     win ? Icons.circle : Icons.circle_outlined,
                     color: win ? Colors.green : Colors.red,
-                    size: 16,
+                    size: 16 * scale,
                   ),
                 )),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24 * scale),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ChoiceChip(
-                  label: const Text('All'),
+                  label: Text('All', style: TextStyle(fontSize: 14 * scale)),
                   selected: _selectedFilter == HitTypeFilter.all,
                   onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.all),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8 * scale),
                 ChoiceChip(
-                  label: const Text('Singles'),
+                  label: Text('Singles', style: TextStyle(fontSize: 14 * scale)),
                   selected: _selectedFilter == HitTypeFilter.singles,
                   onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.singles),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8 * scale),
                 ChoiceChip(
-                  label: const Text('Doubles'),
+                  label: Text('Doubles', style: TextStyle(fontSize: 14 * scale)),
                   selected: _selectedFilter == HitTypeFilter.doubles,
                   onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.doubles),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8 * scale),
                 ChoiceChip(
-                  label: const Text('Triples'),
+                  label: Text('Triples', style: TextStyle(fontSize: 14 * scale)),
                   selected: _selectedFilter == HitTypeFilter.triples,
                   onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.triples),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text('Dartboard Hit Heatmap:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 24 * scale),
+            Text('Dartboard Hit Heatmap:', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
             SizedBox(
-              height: 200,
+              height: 200 * scale,
               child: filteredHeatmap.isEmpty
-                  ? const Center(child: Text('No data'))
+                  ? Center(child: Text('No data', style: TextStyle(fontSize: 16 * scale)))
                   : Scrollbar(
                       thumbVisibility: true,
                       controller: _heatmapScrollController,
@@ -312,7 +308,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                         controller: _heatmapScrollController,
                         scrollDirection: Axis.horizontal,
                         child: SizedBox(
-                          width: filteredHeatmap.length * 24,
+                          width: filteredHeatmap.length * 24 * scale,
                           child: Builder(
                             builder: (context) {
                               final sortedEntries = filteredHeatmap.entries.toList()
@@ -329,7 +325,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                                               BarChartRodData(
                                                 toY: entry.value.value.toDouble(),
                                                 color: entry.value.key == 0 ? Colors.red : Colors.blue,
-                                                width: 12,
+                                                width: 12 * scale,
                                               ),
                                             ],
                                           ))
@@ -338,10 +334,10 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                                     leftTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
-                                        reservedSize: 28,
+                                        reservedSize: 28 * scale,
                                         getTitlesWidget: (value, meta) {
                                           if (value % 1 == 0) {
-                                            return Text(value.toInt().toString(), style: const TextStyle(fontSize: 10));
+                                            return Text(value.toInt().toString(), style: TextStyle(fontSize: 10 * scale));
                                           }
                                           return const SizedBox.shrink();
                                         },
@@ -355,12 +351,12 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                                           if (idx >= 0 && idx < sortedEntries.length) {
                                             return Text(
                                               sortedEntries[idx].key == 0 ? 'M' : sortedEntries[idx].key.toString(),
-                                              style: const TextStyle(fontSize: 12),
+                                              style: TextStyle(fontSize: 12 * scale),
                                             );
                                           }
                                           return const SizedBox.shrink();
                                         },
-                                        reservedSize: 24,
+                                        reservedSize: 24 * scale,
                                       ),
                                     ),
                                     rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -376,30 +372,30 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                       ),
                     ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24 * scale),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Dartboard Spider-Web:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                Text('Dartboard Spider-Web:', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
+                SizedBox(height: 8 * scale),
                 Center(
                   child: SizedBox(
-                    width: 250,
-                    height: 250,
+                    width: 250 * scale,
+                    height: 250 * scale,
                     child: CustomPaint(
                       painter: SpiderWebPainter(
                         filteredHeatmap,
                         maxHits,
-                        Theme.of(context).brightness, // pass brightness
+                        Theme.of(context).brightness,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24 * scale),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text('Last 8 Games:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 24 * scale),
+            Text('Last 8 Games:', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
             ...lastGames.map((g) {
               final date = DateTime.tryParse(g['createdAt'] ?? '') ?? DateTime.now();
               final winner = g['winner'];
@@ -407,8 +403,8 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
               final isWin = completed && winner == widget.playerName;
               final isLoss = completed && winner != null && winner != widget.playerName;
               return ListTile(
-                title: Text('Game Mode: ${g['gameMode'] ?? ''}'),
-                subtitle: Text('Date: ${date.toLocal().toString().split('.')[0]}'),
+                title: Text('Game Mode: ${g['gameMode'] ?? ''}', style: TextStyle(fontSize: 16 * scale)),
+                subtitle: Text('Date: ${date.toLocal().toString().split('.')[0]}', style: TextStyle(fontSize: 14 * scale)),
                 trailing: Text(
                   !completed
                       ? 'In Progress'
@@ -426,6 +422,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                                 ? Colors.red
                                 : Colors.black,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16 * scale,
                   ),
                 ),
                 onTap: () => _showGameDetailsDialog(g),

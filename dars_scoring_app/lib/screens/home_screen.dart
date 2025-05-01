@@ -20,27 +20,43 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('DARTS Scoring App'),
       ),
-      body: Stack(
-        children: [
-          // Welcome message near the top, below the AppBar
-          Positioned(
-            top: 80,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Column(
-                children: const [
-                  Text(
-                    'Welcome to DARTS Scoring!',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 24),
+            const Text(
+              'Welcome to DARTS Scoring!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Black circle background, just a bit larger than the icon
+                  Container(
+                    width: 250,
+                    height: 250,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 17, 17, 17),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  // Dartboard icon, slightly smaller than the black circle
+                  ClipOval(
+                    child: Image.asset(
+                      'assets/icons/dartboard.png',
+                      width: 300,
+                      height: 300,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          // Menu centered on the screen
-          Center(
-            child: Column(
+            const SizedBox(height: 32),
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ElevatedButton(
@@ -95,8 +111,8 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

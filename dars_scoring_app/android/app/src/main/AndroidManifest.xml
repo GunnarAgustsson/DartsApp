@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="dars_scoring_app"
+        android:label="DartsApp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
