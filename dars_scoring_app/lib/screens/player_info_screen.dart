@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:dars_scoring_app/widgets/spiderweb_painter.dart';
 
+enum HitTypeFilter { all, singles, doubles, triples }
+
 class PlayerInfoScreen extends StatefulWidget {
   final String playerName;
   const PlayerInfoScreen({super.key, required this.playerName});
@@ -25,6 +27,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
   int mostHitNumber = 0;
   int mostHitCount = 0;
   List<bool> recentResults = []; // true = win, false = loss
+  HitTypeFilter _selectedFilter = HitTypeFilter.all;
 
   @override
   void initState() {
@@ -125,6 +128,30 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
     });
   }
 
+  Map<int, int> _filteredHeatmap(HitTypeFilter filter) {
+    final filtered = <int, int>{};
+    for (final entry in hitHeatmap.entries) {
+      filtered[entry.key] = 0;
+    }
+    for (final g in lastGames) {
+      final throws = (g['throws'] as List)
+          .where((t) => t['player'] == widget.playerName)
+          .toList();
+      for (final t in throws) {
+        if (t['wasBust'] == true) continue;
+        final value = t['value'] ?? 0;
+        final multiplier = t['multiplier'] ?? 1;
+        if (filter == HitTypeFilter.all ||
+            (filter == HitTypeFilter.singles && multiplier == 1) ||
+            (filter == HitTypeFilter.doubles && multiplier == 2) ||
+            (filter == HitTypeFilter.triples && multiplier == 3)) {
+          filtered[value] = (filtered[value] ?? 0) + 1;
+        }
+      }
+    }
+    return filtered;
+  }
+
   void _showGameDetailsDialog(Map<String, dynamic> game) {
     final throws = (game['throws'] as List)
         .map((t) => {
@@ -181,7 +208,8 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHits = hitHeatmap.values.isEmpty ? 1 : hitHeatmap.values.reduce((a, b) => a > b ? a : b);
+    final filteredHeatmap = _filteredHeatmap(_selectedFilter);
+    final maxHits = filteredHeatmap.values.isEmpty ? 1 : filteredHeatmap.values.reduce((a, b) => a > b ? a : b);
 
     return Scaffold(
       appBar: AppBar(title: Text('${widget.playerName} Stats')),
@@ -233,52 +261,107 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
               ],
             ),
             const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Text('All'),
+                  selected: _selectedFilter == HitTypeFilter.all,
+                  onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.all),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Singles'),
+                  selected: _selectedFilter == HitTypeFilter.singles,
+                  onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.singles),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Doubles'),
+                  selected: _selectedFilter == HitTypeFilter.doubles,
+                  onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.doubles),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Triples'),
+                  selected: _selectedFilter == HitTypeFilter.triples,
+                  onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.triples),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
             const Text('Dartboard Hit Heatmap:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(
               height: 200,
-              child: hitHeatmap.isEmpty
+              child: filteredHeatmap.isEmpty
                   ? const Center(child: Text('No data'))
-                  : BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        barGroups: hitHeatmap.entries
-                            .map((e) => BarChartGroupData(
-                                  x: e.key,
-                                  barRods: [
-                                    BarChartRodData(
-                                      toY: e.value.toDouble(),
-                                      color: Colors.blue,
-                                      width: 8,
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      controller: ScrollController(),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: filteredHeatmap.length * 24,
+                          child: Builder(
+                            builder: (context) {
+                              final sortedEntries = filteredHeatmap.entries.toList()
+                                ..sort((a, b) => b.value.compareTo(a.value));
+                              return BarChart(
+                                BarChartData(
+                                  alignment: BarChartAlignment.spaceAround,
+                                  barGroups: sortedEntries
+                                      .asMap()
+                                      .entries
+                                      .map((entry) => BarChartGroupData(
+                                            x: entry.key,
+                                            barRods: [
+                                              BarChartRodData(
+                                                toY: entry.value.value.toDouble(),
+                                                color: entry.value.key == 0 ? Colors.red : Colors.blue,
+                                                width: 12,
+                                              ),
+                                            ],
+                                          ))
+                                      .toList(),
+                                  titlesData: FlTitlesData(
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 28,
+                                        getTitlesWidget: (value, meta) {
+                                          if (value % 1 == 0) {
+                                            return Text(value.toInt().toString(), style: const TextStyle(fontSize: 10));
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                      ),
                                     ),
-                                  ],
-                                ))
-                            .toList(),
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 28,
-                              getTitlesWidget: (value, meta) {
-                                // Only show whole numbers
-                                if (value % 1 == 0) {
-                                  return Text(value.toInt().toString(), style: const TextStyle(fontSize: 10));
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        getTitlesWidget: (value, meta) {
+                                          final idx = value.toInt();
+                                          if (idx >= 0 && idx < sortedEntries.length) {
+                                            return Text(
+                                              sortedEntries[idx].key == 0 ? 'M' : sortedEntries[idx].key.toString(),
+                                              style: const TextStyle(fontSize: 12),
+                                            );
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                        reservedSize: 24,
+                                      ),
+                                    ),
+                                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  gridData: FlGridData(show: false),
+                                ),
+                              );
+                            },
                           ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) => Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)),
-                              reservedSize: 24,
-                            ),
-                          ),
-                          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
-                        borderData: FlBorderData(show: false),
-                        gridData: FlGridData(show: false),
                       ),
                     ),
             ),
@@ -294,7 +377,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                     height: 250,
                     child: CustomPaint(
                       painter: SpiderWebPainter(
-                        hitHeatmap,
+                        filteredHeatmap,
                         maxHits,
                         Theme.of(context).brightness, // pass brightness
                       ),
