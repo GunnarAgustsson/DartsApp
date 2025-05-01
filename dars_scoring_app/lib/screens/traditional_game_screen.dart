@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:dars_scoring_app/models/game_history.dart';
+import 'package:dars_scoring_app/data/possible_finishes.dart';
 
 class GameScreen extends StatefulWidget {
   final int startingScore;
@@ -197,6 +198,52 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  void _undoLastThrow() {
+    setState(() {
+      if (currentGame.throws.isEmpty) return;
+
+      final lastThrow = currentGame.throws.removeLast();
+      final playerIdx = players.indexOf(lastThrow.player);
+
+      // Restore the previous score for the player
+      int prevScore = widget.startingScore;
+      // Find the last throw for this player, if any
+      for (final t in currentGame.throws.reversed) {
+        if (t.player == lastThrow.player) {
+          prevScore = t.resultingScore;
+          break;
+        }
+      }
+      scores[playerIdx] = prevScore;
+
+      // Remove from finished players if needed
+      if (lastThrow.resultingScore == 0) {
+        _finishedPlayers.remove(lastThrow.player);
+      }
+
+      // Set current player and darts thrown
+      if (currentGame.throws.isNotEmpty) {
+        final prev = currentGame.throws.last;
+        currentPlayer = players.indexOf(prev.player);
+        final playerThrows = currentGame.throws.reversed
+            .takeWhile((t) => t.player == prev.player)
+            .length;
+        dartsThrown = playerThrows % 3;
+        if (dartsThrown == 0) {
+          do {
+            currentPlayer = (currentPlayer + 1) % players.length;
+          } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+        }
+      } else {
+        currentPlayer = 0;
+        dartsThrown = 0;
+      }
+
+      currentGame.modifiedAt = DateTime.now();
+      _saveOrUpdateGameHistory();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -240,9 +287,23 @@ class _GameScreenState extends State<GameScreen> {
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.1,
               child: Center(
-                child: Text(
-                  'Possible finishes: (coming soon)',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                child: Builder(
+                  builder: (context) {
+                    final score = scores[currentPlayer];
+                    final dartsLeft = 3 - dartsThrown;
+                    final finishEntry = possibleFinishes[score];
+                    if (finishEntry != null && finishEntry['darts'] <= dartsLeft) {
+                      return Text(
+                        'Possible finish: ${finishEntry['finish']}',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      );
+                    } else {
+                      return Text(
+                        'No finish possible',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      );
+                    }
+                  },
                 ),
               ),
             ),
@@ -273,7 +334,7 @@ class _GameScreenState extends State<GameScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Number buttons grid
+                  // Number buttons grid and special buttons row
                   Expanded(
                     child: Column(
                       children: [
@@ -286,52 +347,56 @@ class _GameScreenState extends State<GameScreen> {
                               crossAxisSpacing: 8,
                               childAspectRatio: 1.5,
                             ),
-                            itemCount: 20,
+                            itemCount: 22, // 1-20, 25, 50
                             itemBuilder: (context, index) {
-                              return ElevatedButton(
-                                onPressed: () => _score(index + 1),
-                                child: Text('${index + 1}', style: const TextStyle(fontSize: 16)),
-                              );
+                              if (index < 20) {
+                                return ElevatedButton(
+                                  onPressed: () => _score(index + 1),
+                                  child: Text('${index + 1}', style: const TextStyle(fontSize: 16)),
+                                );
+                              } else if (index == 20) {
+                                return ElevatedButton(
+                                  onPressed: () => _score(25),
+                                  child: const Text('25', style: TextStyle(fontSize: 16)),
+                                );
+                              } else {
+                                return ElevatedButton(
+                                  onPressed: () => _score(50),
+                                  child: const Text('50', style: TextStyle(fontSize: 16)),
+                                );
+                              }
                             },
                           ),
                         ),
-                        // Special buttons row: 25, 50, Miss
                         Padding(
-                          padding: const EdgeInsets.only(top: 0, bottom: 80),
+                          padding: const EdgeInsets.only(top: 0, bottom: 8),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
-                                width: 80, height: 40,
-                                child: ElevatedButton(
-                                  onPressed: () => _score(25),
-                                  child: const Text('25', style: TextStyle(fontSize: 16)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 80, height: 40,
-                                child: ElevatedButton(
-                                  onPressed: () => _score(50),
-                                  child: const Text('50', style: TextStyle(fontSize: 16)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 88, // Slightly wider than before
-                                height: 40,
-                                child: ElevatedButton(
+                                width: 120, height: 40,
+                                child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
                                   ),
                                   onPressed: () => _score(0),
-                                  child: const Text(
-                                    'Miss',
-                                    style: TextStyle(fontSize: 16),
-                                    textAlign: TextAlign.center,
-                                    softWrap: false,
+                                  icon: const Icon(Icons.cancel_outlined, size: 20),
+                                  label: const Text('Miss', style: TextStyle(fontSize: 16)),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              SizedBox(
+                                width: 120, height: 40,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(horizontal: 8),
                                   ),
+                                  onPressed: _undoLastThrow,
+                                  icon: const Icon(Icons.undo, size: 20),
+                                  label: const Text('Undo', style: TextStyle(fontSize: 16)),
                                 ),
                               ),
                             ],
