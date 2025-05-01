@@ -39,6 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               'value': t['value'],
               'multiplier': t['multiplier'],
               'resultingScore': t['resultingScore'],
+              'wasBust': t['wasBust'] ?? false,
             })
         .toList();
     final isCompleted = game['completedAt'] != null;
@@ -64,8 +65,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 return ListTile(
                   dense: true,
                   title: Text('${t['player']}'),
-                  subtitle: Text(
-                      'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}'),
+                  subtitle: t['wasBust'] == true
+                      ? Text(
+                          'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}  (Bust)',
+                          style: const TextStyle(color: Colors.red),
+                        )
+                      : Text(
+                          'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}',
+                        ),
                 );
               },
             ),

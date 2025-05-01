@@ -29,6 +29,7 @@ class _GameScreenState extends State<GameScreen> {
   int currentPlayer = 0;
   int dartsThrown = 0;
   int multiplier = 1;
+  int turnStartScore = 0; // <-- Add this
   final List<String> _finishedPlayers = [];
 
   @override
@@ -112,6 +113,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _score(int value) async {
     setState(() {
+      if (dartsThrown == 0) {
+        turnStartScore = scores[currentPlayer]; // <-- Add this
+      }
+
       int hit;
       // 25 and 50 should not benefit from multiplier
       if (value == 25 || value == 50) {
@@ -120,39 +125,104 @@ class _GameScreenState extends State<GameScreen> {
         hit = value * multiplier;
       }
       if (value == 0) hit = 0;
-      scores[currentPlayer] = (scores[currentPlayer] - hit).clamp(0, widget.startingScore);
 
-      // Save the throw
-      final dartThrow = DartThrow(
-        player: players[currentPlayer],
-        value: value,
-        multiplier: (value == 25 || value == 50) ? 1 : multiplier, // Save 1 for 25/50
-        resultingScore: scores[currentPlayer],
-        timestamp: DateTime.now(),
-      );
-      currentGame.throws.add(dartThrow);
+      final int beforeScore = scores[currentPlayer];
+      int afterScore = beforeScore - hit;
+
+      bool isDouble = multiplier == 2;
+      bool isBull = value == 50;
+      bool isBust = false;
+      bool isWinningThrow = false;
+
+      // Bust conditions
+      if (afterScore < 0 || afterScore == 1) {
+        isBust = true;
+      } else if (afterScore == 0) {
+        // Must finish on double or bull (50)
+        if (isDouble || isBull) {
+          isWinningThrow = true;
+        } else {
+          isBust = true;
+        }
+      }
+
+      if (isBust) {
+        // Mark all darts this turn as bust (including this one)
+        // Find all throws for this player in this round (max 3, this turn)
+        int throwsThisTurn = dartsThrown;
+        int throwsFound = 0;
+        // Mark already thrown darts as bust
+        for (int i = currentGame.throws.length - 1; i >= 0 && throwsFound < throwsThisTurn; i--) {
+          if (currentGame.throws[i].player == players[currentPlayer]) {
+            currentGame.throws[i] = DartThrow(
+              player: currentGame.throws[i].player,
+              value: currentGame.throws[i].value,
+              multiplier: currentGame.throws[i].multiplier,
+              resultingScore: currentGame.throws[i].resultingScore,
+              timestamp: currentGame.throws[i].timestamp,
+              wasBust: true,
+            );
+            throwsFound++;
+          }
+        }
+        // Add bust darts for the remaining (not thrown) darts this turn
+        for (int i = throwsThisTurn; i < 3; i++) {
+          currentGame.throws.add(DartThrow(
+            player: players[currentPlayer],
+            value: 0,
+            multiplier: 1,
+            resultingScore: turnStartScore, // <-- Use turnStartScore instead of beforeScore
+            timestamp: DateTime.now(),
+            wasBust: true,
+          ));
+        }
+        // Reset score to what it was at the start of the turn
+        scores[currentPlayer] = turnStartScore; // <-- Use turnStartScore instead of beforeScore
+        dartsThrown = 0;
+        // Move to next player
+        do {
+          currentPlayer = (currentPlayer + 1) % players.length;
+        } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+      } else {
+        // Not a bust, apply the score
+        scores[currentPlayer] = afterScore;
+
+        final dartThrow = DartThrow(
+          player: players[currentPlayer],
+          value: value,
+          multiplier: (value == 25 || value == 50) ? 1 : multiplier,
+          resultingScore: scores[currentPlayer],
+          timestamp: DateTime.now(),
+          wasBust: false,
+        );
+        currentGame.throws.add(dartThrow);
+
+        dartsThrown++;
+
+        // Check if player finished
+        if (isWinningThrow && !_finishedPlayers.contains(players[currentPlayer])) {
+          _finishedPlayers.add(players[currentPlayer]);
+          if (_finishedPlayers.length == players.length) {
+            currentGame.completedAt = DateTime.now();
+            _saveOrUpdateGameHistory();
+          }
+          _showWinnerDialog(players[currentPlayer]);
+        } else {
+          // Next player if 3 darts thrown
+          if (dartsThrown >= 3) {
+            dartsThrown = 0;
+            do {
+              currentPlayer = (currentPlayer + 1) % players.length;
+            } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+          }
+        }
+      }
+
       currentGame.modifiedAt = DateTime.now();
       _saveOrUpdateGameHistory();
 
+      // Reset multiplier after each throw
       multiplier = 1;
-      dartsThrown++;
-
-      // Check if player finished
-      if (scores[currentPlayer] == 0 && !_finishedPlayers.contains(players[currentPlayer])) {
-        _finishedPlayers.add(players[currentPlayer]);
-        if (_finishedPlayers.length == players.length) {
-          currentGame.completedAt = DateTime.now();
-          _saveOrUpdateGameHistory();
-        }
-        _showWinnerDialog(players[currentPlayer]);
-      } else {
-        if (dartsThrown >= 3) {
-          dartsThrown = 0;
-          do {
-            currentPlayer = (currentPlayer + 1) % players.length;
-          } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
-        }
-      }
     });
   }
 

@@ -4,6 +4,7 @@ class DartThrow {
   final int multiplier;
   final int resultingScore;
   final DateTime timestamp;
+  final bool wasBust;
 
   DartThrow({
     required this.player,
@@ -11,6 +12,7 @@ class DartThrow {
     required this.multiplier,
     required this.resultingScore,
     required this.timestamp,
+    this.wasBust = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -19,6 +21,7 @@ class DartThrow {
         'multiplier': multiplier,
         'resultingScore': resultingScore,
         'timestamp': timestamp.toIso8601String(),
+        'wasBust': wasBust,
       };
 
   static DartThrow fromJson(Map<String, dynamic> json) => DartThrow(
@@ -27,6 +30,7 @@ class DartThrow {
         multiplier: json['multiplier'],
         resultingScore: json['resultingScore'],
         timestamp: DateTime.parse(json['timestamp']),
+        wasBust: json['wasBust'] ?? false,
       );
 }
 
