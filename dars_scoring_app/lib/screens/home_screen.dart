@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 import 'players_screen.dart';
 import 'game_modes_screen.dart';
 import 'history_screen.dart';
+import 'options_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final bool isDarkMode;
+  final ValueChanged<bool> onThemeChanged;
+
+  const HomeScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +67,15 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                // TODO: Navigate to Options screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OptionsScreen(
+                      isDarkMode: isDarkMode,
+                      onThemeChanged: onThemeChanged,
+                    ),
+                  ),
+                );
               },
               child: const Text('Options'),
             ),

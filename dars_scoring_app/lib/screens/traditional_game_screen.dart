@@ -346,6 +346,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return WillPopScope(
       onWillPop: () async {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -353,18 +355,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: Colors.grey[200], // Light-grey background
+          backgroundColor: isDark ? Colors.grey[900] : Colors.grey[200], // Darker in dark mode
           leading: IconButton(
-            icon: const Icon(Icons.home, color: Colors.grey),
+            icon: Icon(Icons.home, color: isDark ? Colors.white70 : Colors.grey),
             onPressed: () {
               Navigator.of(context).popUntil((route) => route.isFirst);
             },
           ),
           title: Text(
             'Darts Game (${widget.startingScore})',
-            style: const TextStyle(color: Colors.black), // Make title text dark for contrast
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
           ),
-          iconTheme: const IconThemeData(color: Colors.grey), // Make icons grey
+          iconTheme: IconThemeData(color: isDark ? Colors.white70 : Colors.grey),
         ),
         body: Column(
           children: [
@@ -446,7 +448,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         'assets/icons/dart-icon.svg',
                         width: 32,
                         height: 32,
-                        colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                        colorFilter: ColorFilter.mode(
+                          isDark ? Colors.white : Colors.black,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                   ),
