@@ -75,12 +75,12 @@ class SpiderWebPainter extends CustomPainter {
     path.close();
     if (hasData) {
       final Paint sectorPaint = Paint()
-        ..color = Colors.blue.withOpacity(0.7)
+        ..color = Colors.blue.withValues(alpha: 0.7)
         ..style = PaintingStyle.fill;
       final Paint borderPaint = Paint()
-        ..color = brightness == Brightness.dark ? Colors.white : Colors.black
+        ..color = Colors.grey
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = 0.5;
       canvas.drawPath(path, sectorPaint);
       canvas.drawPath(path, borderPaint);
     }

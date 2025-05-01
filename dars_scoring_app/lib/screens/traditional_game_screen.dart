@@ -39,6 +39,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late Animation<Color?> _bustColorAnimation;
   late AnimationController _turnController;
   late Animation<Color?> _turnColorAnimation;
+  bool isTurnChanging = false;
+  int? _pendingNextPlayer;
 
   @override
   void initState() {
@@ -97,8 +99,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 400),
     );
     _bustColorAnimation = ColorTween(
-      begin: Colors.transparent,
-      end: Colors.red.withOpacity(0.7),
+      begin: Colors.red, 
+      end: Colors.red,   
     ).animate(_bustController);
 
     _turnController = AnimationController(
@@ -106,8 +108,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 400),
     );
     _turnColorAnimation = ColorTween(
-      begin: Colors.transparent,
-      end: Colors.blue.withOpacity(0.7),
+      begin: Colors.blue, 
+      end: Colors.blue,   
     ).animate(_turnController);
   }
 
@@ -204,17 +206,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           setState(() {
             showBust = false;
             _bustController.reset();
+            isTurnChanging = true;
+            int temp = currentPlayer;
+            do {
+              temp = (temp + 1) % players.length;
+            } while (_finishedPlayers.contains(players[temp]) && _finishedPlayers.length < players.length);
+            _pendingNextPlayer = temp;
             showTurnChange = true;
             _turnController.forward(from: 0);
             Future.delayed(const Duration(seconds: 2), () {
               setState(() {
+                currentPlayer = _pendingNextPlayer!;
+                _pendingNextPlayer = null;
                 showTurnChange = false;
+                isTurnChanging = false;
                 _turnController.reset();
               });
             });
-            do {
-              currentPlayer = (currentPlayer + 1) % players.length;
-            } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
           });
         });
       } else {
@@ -255,15 +263,21 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         } else {
           if (dartsThrown >= 3) {
             dartsThrown = 0;
+            isTurnChanging = true;
+            int temp = currentPlayer;
+            do {
+              temp = (temp + 1) % players.length;
+            } while (_finishedPlayers.contains(players[temp]) && _finishedPlayers.length < players.length);
+            _pendingNextPlayer = temp;
             showTurnChange = true;
             _turnController.forward(from: 0);
             Future.delayed(const Duration(seconds: 2), () {
               setState(() {
+                currentPlayer = _pendingNextPlayer!;
+                _pendingNextPlayer = null;
                 showTurnChange = false;
+                isTurnChanging = false;
                 _turnController.reset();
-                do {
-                  currentPlayer = (currentPlayer + 1) % players.length;
-                } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
               });
             });
           }
@@ -386,151 +400,149 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         body: Column(
           children: [
             SizedBox(
-              height: 100,
-              child: Center(
-                child: Builder(
-                  builder: (context) {
-                    // Calculate average per 3 darts for current player, excluding busts
-                    final playerThrows = currentGame.throws
-                        .where((t) => t.player == players[currentPlayer] && !t.wasBust)
-                        .toList();
-                    final totalScore = playerThrows.fold<int>(0, (sum, t) => sum + (t.value * t.multiplier));
-                    final dartCount = playerThrows.length;
-                    final avgPer3 = dartCount > 0 ? (totalScore / dartCount * 3).toStringAsFixed(1) : '0.0';
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          shortenName(players[currentPlayer], maxLength: 12),
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          "Avg/3: $avgPer3",
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+              height: 400,
+              child: Stack(
+                children: [
+                  // Main player info container
+                  Center(
+                    child: Container(
+                      width: 390,
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.20,
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_bustController, _turnController]),
-                builder: (context, child) {
-                  Color? bgColor = Colors.transparent;
-                  if (showBust) {
-                    bgColor = _bustColorAnimation.value;
-                  } else if (showTurnChange) {
-                    bgColor = _turnColorAnimation.value;
-                  }
-                  // Calculate the next player index for the turn change animation
-                  int nextPlayer = currentPlayer;
-                  if (showTurnChange) {
-                    int temp = currentPlayer;
-                    do {
-                      temp = (temp + 1) % players.length;
-                    } while (_finishedPlayers.contains(players[temp]) && _finishedPlayers.length < players.length);
-                    nextPlayer = temp;
-                  }
-                  return Container(
-                    color: bgColor,
-                    child: Center(
-                      child: showBust
-                          ? const Text(
-                              'BUST',
-                              style: TextStyle(
-                                fontSize: 72,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 4,
-                              ),
-                            )
-                          : showTurnChange
-                              ? Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      shortenName(players[nextPlayer], maxLength: 12), // Show upcoming player
-                                      style: const TextStyle(
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Player name
+                          Text(
+                            shortenName(players[currentPlayer], maxLength: 12),
+                            style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          // Score
+                          Text(
+                            '${scores[currentPlayer]}',
+                            style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          // Remaining darts
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              3,
+                              (i) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Opacity(
+                                  opacity: i < (3 - dartsThrown) ? 1.0 : 0.2,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/dart-icon.svg',
+                                    width: 32,
+                                    height: 32,
+                                    colorFilter: ColorFilter.mode(
+                                      Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                      BlendMode.srcIn,
                                     ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      "It's your turn",
-                                      style: TextStyle(
-                                        fontSize: 28,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Text(
-                                  '${scores[currentPlayer]}',
-                                  style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            SizedBox(
-              height: 40,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  3,
-                  (i) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Opacity(
-                      opacity: i < (3 - dartsThrown) ? 1.0 : 0.2, // faded if dart used
-                      child: SvgPicture.asset(
-                        'assets/icons/dart-icon.svg',
-                        width: 32,
-                        height: 32,
-                        colorFilter: ColorFilter.mode(
-                          isDark ? Colors.white : Colors.black,
-                          BlendMode.srcIn,
-                        ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Possible finish
+                          Builder(
+                            builder: (context) {
+                              final score = scores[currentPlayer];
+                              final dartsLeft = 3 - dartsThrown;
+                              final finishEntry = possibleFinishes[score];
+                              if (finishEntry != null && finishEntry['darts'] <= dartsLeft) {
+                                return Text(
+                                  'Possible finish: ${finishEntry['finish']}',
+                                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                                );
+                              } else {
+                                return Text(
+                                  'No finish possible',
+                                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                                );
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              ),
-            ),
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.1,
-              child: Center(
-                child: Builder(
-                  builder: (context) {
-                    final score = scores[currentPlayer];
-                    final dartsLeft = 3 - dartsThrown;
-                    final finishEntry = possibleFinishes[score];
-                    if (finishEntry != null && finishEntry['darts'] <= dartsLeft) {
-                      return Text(
-                        'Possible finish: ${finishEntry['finish']}',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                      );
-                    } else {
-                      return Text(
-                        'No finish possible',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                      );
-                    }
-                  },
-                ),
+                  // Overlay animation (covers the whole container)
+                  if (showBust || showTurnChange)
+                    Positioned.fill(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([_bustController, _turnController]),
+                        builder: (context, child) {
+                          Color? bgColor = Colors.transparent;
+                          if (showBust) {
+                            bgColor = _bustColorAnimation.value;
+                          } else if (showTurnChange) {
+                            bgColor = _turnColorAnimation.value;
+                          }
+                          int nextPlayer = currentPlayer;
+                          if (showTurnChange && _pendingNextPlayer != null) {
+                            nextPlayer = _pendingNextPlayer!;
+                          }
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Center(
+                              child: showBust
+                                  ? const Text(
+                                      'BUST',
+                                      style: TextStyle(
+                                        fontSize: 72,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: 4,
+                                      ),
+                                    )
+                                  : showTurnChange
+                                      ? Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              shortenName(players[nextPlayer], maxLength: 12),
+                                              style: const TextStyle(
+                                                fontSize: 40,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            const Text(
+                                              "It's your turn",
+                                              style: TextStyle(
+                                                fontSize: 28,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : const SizedBox.shrink(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ),
             ),
             Expanded(
@@ -574,17 +586,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             itemBuilder: (context, index) {
                               if (index < 20) {
                                 return ElevatedButton(
-                                  onPressed: () => _score(index + 1),
+                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(index + 1),
                                   child: Text('${index + 1}', style: const TextStyle(fontSize: 16)),
                                 );
                               } else if (index == 20) {
                                 return ElevatedButton(
-                                  onPressed: () => _score(25),
+                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(25),
                                   child: const Text('25', style: TextStyle(fontSize: 16)),
                                 );
                               } else {
                                 return ElevatedButton(
-                                  onPressed: () => _score(50),
+                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(50),
                                   child: const Text('Bull', style: TextStyle(fontSize: 14)),
                                 );
                               }
@@ -603,7 +615,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
                                   ),
-                                  onPressed: () => _score(0),
+                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(0),
                                   icon: const Icon(Icons.cancel_outlined, size: 20),
                                   label: const Text('Miss', style: TextStyle(fontSize: 16)),
                                 ),
@@ -617,7 +629,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                     foregroundColor: Colors.white,
                                     padding: EdgeInsets.symmetric(horizontal: 8),
                                   ),
-                                  onPressed: _undoLastThrow,
+                                  onPressed: (isTurnChanging || showBust) ? null : _undoLastThrow,
                                   icon: const Icon(Icons.undo, size: 20),
                                   label: const Text('Undo', style: TextStyle(fontSize: 16)),
                                 ),

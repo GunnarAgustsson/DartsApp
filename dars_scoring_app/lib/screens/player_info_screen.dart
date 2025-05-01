@@ -28,6 +28,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
   int mostHitCount = 0;
   List<bool> recentResults = []; // true = win, false = loss
   HitTypeFilter _selectedFilter = HitTypeFilter.all;
+  final ScrollController _heatmapScrollController = ScrollController();
 
   @override
   void initState() {
@@ -297,8 +298,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                   ? const Center(child: Text('No data'))
                   : Scrollbar(
                       thumbVisibility: true,
-                      controller: ScrollController(),
+                      controller: _heatmapScrollController,
                       child: SingleChildScrollView(
+                        controller: _heatmapScrollController,
                         scrollDirection: Axis.horizontal,
                         child: SizedBox(
                           width: filteredHeatmap.length * 24,
@@ -424,5 +426,11 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _heatmapScrollController.dispose();
+    super.dispose();
   }
 }
