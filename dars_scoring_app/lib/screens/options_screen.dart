@@ -37,12 +37,64 @@ class _OptionsScreenState extends State<OptionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Options')),
-      body: ListView(
+      body: Column(
         children: [
-          SwitchListTile(
-            title: const Text('Dark Mode'),
-            value: _darkMode,
-            onChanged: _toggleDarkMode,
+          Expanded(
+            child: ListView(
+              children: [
+                SwitchListTile(
+                  title: const Text('Dark Mode'),
+                  value: _darkMode,
+                  onChanged: _toggleDarkMode,
+                ),
+                const Divider(),
+                // ...add more options here if needed...
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Center(
+              child: GestureDetector(
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Confirm Erase'),
+                      content: const Text('Are you sure you want to erase all app data? This cannot be undone.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('Erase', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.clear();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('All data erased')),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Erase All Data',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

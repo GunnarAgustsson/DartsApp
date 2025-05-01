@@ -82,16 +82,26 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
       }
 
       // Most hit number
-      for (final t in throws) {
-        if (t['wasBust'] == true) continue;
-        allScores.add((t['value'] ?? 0) * (t['multiplier'] ?? 1));
-        int value = t['value'] ?? 0;
-        heatmap[value] = (heatmap[value] ?? 0) + 1;
-        hitCount[value] = (hitCount[value] ?? 0) + 1;
+      final completed = game['completedAt'] != null;
+      if (completed) {
+        for (final t in throws) {
+          if (t['wasBust'] == true) continue;
+          allScores.add((t['value'] ?? 0) * (t['multiplier'] ?? 1));
+          int value = t['value'] ?? 0;
+          heatmap[value] = (heatmap[value] ?? 0) + 1;
+          hitCount[value] = (hitCount[value] ?? 0) + 1;
+        }
+      } else {
+        // Still count for heatmap and hitCount, but not for allScores/avg
+        for (final t in throws) {
+          if (t['wasBust'] == true) continue;
+          int value = t['value'] ?? 0;
+          heatmap[value] = (heatmap[value] ?? 0) + 1;
+          hitCount[value] = (hitCount[value] ?? 0) + 1;
+        }
       }
 
       // Recent results (win/loss)
-      final completed = game['completedAt'] != null;
       final winner = game['winner'];
       if (completed && winner != null) {
         lastResults.add(winner == widget.playerName);
@@ -163,7 +173,6 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
               'wasBust': t['wasBust'] ?? false,
             })
         .toList();
-    final players = (game['players'] as List).cast<String>();
     final date = DateTime.tryParse(game['createdAt'] ?? '') ?? DateTime.now();
 
     showDialog(

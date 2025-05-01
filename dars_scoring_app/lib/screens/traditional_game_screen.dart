@@ -375,7 +375,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+    final scale = width / 390; // 390 is a typical mobile width, adjust as needed
 
     return WillPopScope(
       onWillPop: () async {
@@ -384,162 +387,31 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: isDark ? Colors.grey[900] : Colors.grey[200], // Darker in dark mode
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.grey[200],
           leading: IconButton(
-            icon: Icon(Icons.home, color: isDark ? Colors.white70 : Colors.grey),
+            icon: Icon(Icons.home, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey),
             onPressed: () {
               Navigator.of(context).popUntil((route) => route.isFirst);
             },
           ),
           title: Text(
             'Darts Game (${widget.startingScore})',
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
           ),
-          iconTheme: IconThemeData(color: isDark ? Colors.white70 : Colors.grey),
+          iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey),
         ),
         body: Column(
           children: [
             SizedBox(
-              height: 400,
+              height: 350 * scale,
               child: Stack(
                 children: [
-                  // Main player info container
-                  Center(
-                    child: Container(
-                      width: 390,
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Player name
-                          Text(
-                            shortenName(players[currentPlayer], maxLength: 12),
-                            style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          // Score
-                          Text(
-                            '${scores[currentPlayer]}',
-                            style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          // Remaining darts
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              3,
-                              (i) => Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Opacity(
-                                  opacity: i < (3 - dartsThrown) ? 1.0 : 0.2,
-                                  child: SvgPicture.asset(
-                                    'assets/icons/dart-icon.svg',
-                                    width: 32,
-                                    height: 32,
-                                    colorFilter: ColorFilter.mode(
-                                      Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Possible finish
-                          Builder(
-                            builder: (context) {
-                              final score = scores[currentPlayer];
-                              final dartsLeft = 3 - dartsThrown;
-                              final finishEntry = possibleFinishes[score];
-                              if (finishEntry != null && finishEntry['darts'] <= dartsLeft) {
-                                return Text(
-                                  'Possible finish: ${finishEntry['finish']}',
-                                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                                );
-                              } else {
-                                return Text(
-                                  'No finish possible',
-                                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                                );
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Overlay animation (covers the whole container)
+                  _buildPlayerInfoCard(context, scale),
                   if (showBust || showTurnChange)
                     Positioned.fill(
                       child: AnimatedBuilder(
                         animation: Listenable.merge([_bustController, _turnController]),
-                        builder: (context, child) {
-                          Color? bgColor = Colors.transparent;
-                          if (showBust) {
-                            bgColor = _bustColorAnimation.value;
-                          } else if (showTurnChange) {
-                            bgColor = _turnColorAnimation.value;
-                          }
-                          int nextPlayer = currentPlayer;
-                          if (showTurnChange && _pendingNextPlayer != null) {
-                            nextPlayer = _pendingNextPlayer!;
-                          }
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: showBust
-                                  ? const Text(
-                                      'BUST',
-                                      style: TextStyle(
-                                        fontSize: 72,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        letterSpacing: 4,
-                                      ),
-                                    )
-                                  : showTurnChange
-                                      ? Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              shortenName(players[nextPlayer], maxLength: 12),
-                                              style: const TextStyle(
-                                                fontSize: 40,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            const Text(
-                                              "It's your turn",
-                                              style: TextStyle(
-                                                fontSize: 28,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        )
-                                      : const SizedBox.shrink(),
-                            ),
-                          );
-                        },
+                        builder: (context, child) => _buildOverlayAnimation(scale),
                       ),
                     ),
                 ],
@@ -559,7 +431,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         onPressed: () => _setMultiplier(2),
                         child: const Text('x2'),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16 * scale),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: multiplier == 3 ? Colors.blue : null,
@@ -569,69 +441,60 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8 * scale),
                   Expanded(
                     child: Column(
                       children: [
                         Expanded(
                           child: GridView.builder(
-                            padding: const EdgeInsets.all(8),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            padding: EdgeInsets.all(8 * scale),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 5,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8 * scale,
+                              crossAxisSpacing: 8 * scale,
                               childAspectRatio: 1.5,
                             ),
                             itemCount: 22,
                             itemBuilder: (context, index) {
                               if (index < 20) {
-                                return ElevatedButton(
-                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(index + 1),
-                                  child: Text('${index + 1}', style: const TextStyle(fontSize: 16)),
-                                );
+                                return _buildScoreButton(index + 1, scale: scale);
                               } else if (index == 20) {
-                                return ElevatedButton(
-                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(25),
-                                  child: const Text('25', style: TextStyle(fontSize: 16)),
-                                );
+                                return _buildScoreButton(25, label: '25', scale: scale);
                               } else {
-                                return ElevatedButton(
-                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(50),
-                                  child: const Text('Bull', style: TextStyle(fontSize: 14)),
-                                );
+                                return _buildScoreButton(50, label: 'Bull', fontSize: 12 * scale, scale: scale);
                               }
                             },
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(top: 0, bottom: 8),
+                          padding: EdgeInsets.only(top: 0, bottom: 50 * scale),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
-                                width: 120, height: 40,
+                                width: 120 * scale, height: 40 * scale,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
                                   ),
                                   onPressed: (isTurnChanging || showBust) ? null : () => _score(0),
-                                  icon: const Icon(Icons.cancel_outlined, size: 20),
-                                  label: const Text('Miss', style: TextStyle(fontSize: 16)),
+                                  icon: Icon(Icons.cancel_outlined, size: 20 * scale),
+                                  label: Text('Miss', style: TextStyle(fontSize: 16 * scale)),
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: 16 * scale),
                               SizedBox(
-                                width: 120, height: 40,
+                                width: 120 * scale, height: 40 * scale,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(horizontal: 8),
+                                    padding: EdgeInsets.symmetric(horizontal: 8 * scale),
                                   ),
                                   onPressed: (isTurnChanging || showBust) ? null : _undoLastThrow,
-                                  icon: const Icon(Icons.undo, size: 20),
-                                  label: const Text('Undo', style: TextStyle(fontSize: 16)),
+                                  icon: Icon(Icons.undo, size: 20 * scale),
+                                  label: Text('Undo', style: TextStyle(fontSize: 16 * scale)),
                                 ),
                               ),
                             ],
@@ -646,6 +509,148 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPlayerInfoCard(BuildContext context, double scale) {
+    return Center(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        padding: EdgeInsets.symmetric(vertical: 16 * scale, horizontal: 24 * scale),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16 * scale),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8 * scale,
+              offset: Offset(0, 2 * scale),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              shortenName(players[currentPlayer], maxLength: 12),
+              style: TextStyle(fontSize: 42 * scale, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 8 * scale),
+            Text(
+              '${scores[currentPlayer]}',
+              style: TextStyle(fontSize: 72 * scale, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8 * scale),
+            _buildDartIcons(context, iconSize: 32 * scale),
+            SizedBox(height: 8 * scale),
+            _buildPossibleFinish(fontSize: 18 * scale),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDartIcons(BuildContext context, {double iconSize = 32}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(
+        3,
+        (i) => Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
+          child: Opacity(
+            opacity: i < (3 - dartsThrown) ? 1.0 : 0.2,
+            child: SvgPicture.asset(
+              'assets/icons/dart-icon.svg',
+              width: iconSize,
+              height: iconSize,
+              colorFilter: ColorFilter.mode(
+                Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPossibleFinish({double fontSize = 18}) {
+    final score = scores[currentPlayer];
+    final dartsLeft = 3 - dartsThrown;
+    final finishEntry = possibleFinishes[score];
+    if (finishEntry != null && finishEntry['darts'] <= dartsLeft) {
+      return Text(
+        'Possible finish: ${finishEntry['finish']}',
+        style: TextStyle(fontSize: fontSize, color: Colors.grey[600]),
+      );
+    } else {
+      return Text(
+        'No finish possible',
+        style: TextStyle(fontSize: fontSize, color: Colors.grey[600]),
+      );
+    }
+  }
+
+  Widget _buildOverlayAnimation(double scale) {
+    Color? bgColor = Colors.transparent;
+    if (showBust) {
+      bgColor = _bustColorAnimation.value;
+    } else if (showTurnChange) {
+      bgColor = _turnColorAnimation.value;
+    }
+    int nextPlayer = currentPlayer;
+    if (showTurnChange && _pendingNextPlayer != null) {
+      nextPlayer = _pendingNextPlayer!;
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16 * scale),
+      ),
+      child: Center(
+        child: showBust
+            ? Text(
+                'BUST',
+                style: TextStyle(
+                  fontSize: 72 * scale,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 4,
+                ),
+              )
+            : showTurnChange
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        shortenName(players[nextPlayer], maxLength: 12),
+                        style: TextStyle(
+                          fontSize: 40 * scale,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 8 * scale),
+                      Text(
+                        "It's your turn",
+                        style: TextStyle(
+                          fontSize: 28 * scale,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  Widget _buildScoreButton(int value, {String? label, double fontSize = 16, double scale = 1.0}) {
+    return ElevatedButton(
+      onPressed: (isTurnChanging || showBust) ? null : () => _score(value),
+      child: Text(label ?? '$value', style: TextStyle(fontSize: fontSize * scale)),
     );
   }
 }
