@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dars_scoring_app/screens/player_info_screen.dart';
 
 class PlayersScreen extends StatefulWidget {
   const PlayersScreen({super.key});
@@ -132,6 +133,14 @@ class _PlayersScreenState extends State<PlayersScreen> {
                       );
                     },
                   ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PlayerInfoScreen(playerName: players[index]),
+                      ),
+                    );
+                  },
                 );
               },
             ),

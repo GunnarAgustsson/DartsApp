@@ -33,11 +33,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return game['gameMode']?.toString() ?? 'Unknown';
   }
 
-  String _shortenPlayers(String players, {int maxLength = 32}) {
-    if (players.length <= maxLength) return players;
-    return players.substring(0, maxLength - 3) + '...';
-  }
-
   void _showGameDetailsDialog(Map<String, dynamic> game) {
     final throws = (game['throws'] as List)
         .map((t) => {
@@ -60,7 +55,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Game Details'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Game Details'),
+              if (isCompleted && game['winner'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Winner: ${game['winner']}',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: Scrollbar(
@@ -128,11 +140,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 final isCompleted = game['completedAt'] != null;
                 return ListTile(
                   title: Text('Game Mode: ${_getGameMode(game)}'),
-                  subtitle: Text(
-                    'Date: ${date.toLocal().toString().split('.')[0]}\n'
-                    'Players: ${shortenName(players, maxLength: 32)}\n',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Date: ${date.toLocal().toString().split('.')[0]}\n'
+                        'Players: ${shortenName(players, maxLength: 32)}\n',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (isCompleted && game['winner'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'Winner: ${game['winner']}',
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,

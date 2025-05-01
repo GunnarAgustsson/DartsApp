@@ -233,6 +233,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
         if (isWinningThrow && !_finishedPlayers.contains(players[currentPlayer])) {
           _finishedPlayers.add(players[currentPlayer]);
+          // Set winner if not already set
+          if (currentGame.winner == null) {
+            currentGame = GameHistory(
+              id: currentGame.id,
+              players: currentGame.players,
+              createdAt: currentGame.createdAt,
+              modifiedAt: DateTime.now(),
+              throws: currentGame.throws,
+              completedAt: null,
+              gameMode: currentGame.gameMode,
+              winner: players[currentPlayer],
+            );
+            _saveOrUpdateGameHistory();
+          }
           if (_finishedPlayers.length == players.length) {
             currentGame.completedAt = DateTime.now();
             _saveOrUpdateGameHistory();
@@ -418,6 +432,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   } else if (showTurnChange) {
                     bgColor = _turnColorAnimation.value;
                   }
+                  // Calculate the next player index for the turn change animation
+                  int nextPlayer = currentPlayer;
+                  if (showTurnChange) {
+                    int temp = currentPlayer;
+                    do {
+                      temp = (temp + 1) % players.length;
+                    } while (_finishedPlayers.contains(players[temp]) && _finishedPlayers.length < players.length);
+                    nextPlayer = temp;
+                  }
                   return Container(
                     color: bgColor,
                     child: Center(
@@ -436,7 +459,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      shortenName(players[currentPlayer], maxLength: 12),
+                                      shortenName(players[nextPlayer], maxLength: 12), // Show upcoming player
                                       style: const TextStyle(
                                         fontSize: 40,
                                         fontWeight: FontWeight.bold,

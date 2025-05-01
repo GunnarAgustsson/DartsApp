@@ -41,7 +41,8 @@ class GameHistory {
   DateTime modifiedAt;
   DateTime? completedAt;
   final List<DartThrow> throws;
-  final int gameMode; // <-- Add this
+  final int gameMode;
+  final String? winner;
 
   GameHistory({
     required this.id,
@@ -49,8 +50,9 @@ class GameHistory {
     required this.createdAt,
     required this.modifiedAt,
     required this.throws,
-    required this.gameMode, // <-- Add this
+    required this.gameMode,
     this.completedAt,
+    this.winner,
   });
 
   Map<String, dynamic> toJson() => {
@@ -60,7 +62,8 @@ class GameHistory {
         'modifiedAt': modifiedAt.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
         'throws': throws.map((e) => e.toJson()).toList(),
-        'gameMode': gameMode, // <-- Add this
+        'gameMode': gameMode,
+        'winner': winner,
       };
 
   static GameHistory fromJson(Map<String, dynamic> json) => GameHistory(
@@ -70,6 +73,7 @@ class GameHistory {
         modifiedAt: DateTime.parse(json['modifiedAt']),
         completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
         throws: (json['throws'] as List).map((e) => DartThrow.fromJson(e)).toList(),
-        gameMode: json['gameMode'] ?? 501, // fallback for old games
+        gameMode: json['gameMode'] ?? 501,
+        winner: json['winner'],
       );
 }
