@@ -21,8 +21,8 @@ class HomeScreen extends StatelessWidget {
 
     // Reusable variables for consistent sizing
     final double buttonWidth = 240 * scale;
-    final double buttonHeight = 32 * scale;
-    final double buttonFontSize = 20 * scale;
+    final double buttonHeight = 48 * scale;
+    final double buttonFontSize = 26 * scale;
     final double buttonPaddingV = 8 * scale;
     final double titleFontSize = 24 * scale;
     final double iconCircleSize = 130 * scale;

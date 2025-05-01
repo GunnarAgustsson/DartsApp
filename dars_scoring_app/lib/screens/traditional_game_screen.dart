@@ -400,9 +400,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final double overlayTurnTextFontSize = 28 * scale;
     final double scoreButtonFontSize = 18 * scale;
     // Button sizes for special buttons
-    final double multiplierButtonWidth = 72 * scale;
-    final double multiplierButtonHeight = 42 * scale;
-    final double multiplierButtonFontSize = 16 * scale;
+    final double multiplierButtonWidth = 96 * scale;
+    final double multiplierButtonHeight = 52 * scale;
+    final double multiplierButtonFontSize = 20 * scale;
 
     final double missUndoButtonWidth = 124 * scale;
     final double missUndoButtonHeight = 42 * scale;
