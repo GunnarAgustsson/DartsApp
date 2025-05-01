@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'traditional_game_screen.dart';
+import 'package:dars_scoring_app/utils/string_utils.dart';
 import '../models/game_history.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -32,6 +33,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return game['gameMode']?.toString() ?? 'Unknown';
   }
 
+  String _shortenPlayers(String players, {int maxLength = 32}) {
+    if (players.length <= maxLength) return players;
+    return players.substring(0, maxLength - 3) + '...';
+  }
+
   void _showGameDetailsDialog(Map<String, dynamic> game) {
     final throws = (game['throws'] as List)
         .map((t) => {
@@ -57,24 +63,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
           title: const Text('Game Details'),
           content: SizedBox(
             width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: throws.length,
-              itemBuilder: (context, index) {
-                final t = throws[index];
-                return ListTile(
-                  dense: true,
-                  title: Text('${t['player']}'),
-                  subtitle: t['wasBust'] == true
-                      ? Text(
-                          'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}  (Bust)',
-                          style: const TextStyle(color: Colors.red),
-                        )
-                      : Text(
-                          'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}',
-                        ),
-                );
-              },
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: throws.length,
+                itemBuilder: (context, index) {
+                  final t = throws[index];
+                  return ListTile(
+                    dense: true,
+                    title: Text('${t['player']}'),
+                    subtitle: t['wasBust'] == true
+                        ? Text(
+                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}  (Bust)',
+                            style: const TextStyle(color: Colors.red),
+                          )
+                        : Text(
+                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}',
+                          ),
+                  );
+                },
+              ),
             ),
           ),
           actions: [
@@ -121,7 +130,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   title: Text('Game Mode: ${_getGameMode(game)}'),
                   subtitle: Text(
                     'Date: ${date.toLocal().toString().split('.')[0]}\n'
-                    'Players: $players',
+                    'Players: ${shortenName(players, maxLength: 32)}\n',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,

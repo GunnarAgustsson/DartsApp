@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:dars_scoring_app/models/game_history.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:dars_scoring_app/utils/string_utils.dart';
 
 class GameScreen extends StatefulWidget {
   final int startingScore;
@@ -373,9 +374,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             SizedBox(
               height: 100,
               child: Center(
-                child: Text(
-                  "${players[currentPlayer]}",
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                child: Builder(
+                  builder: (context) {
+                    // Calculate average per 3 darts for current player, excluding busts
+                    final playerThrows = currentGame.throws
+                        .where((t) => t.player == players[currentPlayer] && !t.wasBust)
+                        .toList();
+                    final totalScore = playerThrows.fold<int>(0, (sum, t) => sum + (t.value * t.multiplier));
+                    final dartCount = playerThrows.length;
+                    final avgPer3 = dartCount > 0 ? (totalScore / dartCount * 3).toStringAsFixed(1) : '0.0';
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          shortenName(players[currentPlayer], maxLength: 12),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          "Avg/3: $avgPer3",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -408,12 +436,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      players[currentPlayer],
+                                      shortenName(players[currentPlayer], maxLength: 12),
                                       style: const TextStyle(
                                         fontSize: 40,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 8),
                                     const Text(
