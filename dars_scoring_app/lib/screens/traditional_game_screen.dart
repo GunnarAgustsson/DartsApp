@@ -8,20 +8,20 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 class GameScreen extends StatefulWidget {
   final int startingScore;
   final List<String> players;
-  final GameHistory? gameHistory; // <-- Add this
+  final GameHistory? gameHistory;
 
   const GameScreen({
     super.key,
     required this.startingScore,
     required this.players,
-    this.gameHistory, // <-- Add this
+    this.gameHistory,
   });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late List<String> players;
   late List<int> scores;
   late String gameId;
@@ -29,20 +29,24 @@ class _GameScreenState extends State<GameScreen> {
   int currentPlayer = 0;
   int dartsThrown = 0;
   int multiplier = 1;
-  int turnStartScore = 0; // <-- Add this
+  int turnStartScore = 0;
   final List<String> _finishedPlayers = [];
+  bool showBust = false;
+  bool showTurnChange = false;
+  late AnimationController _bustController;
+  late Animation<Color?> _bustColorAnimation;
+  late AnimationController _turnController;
+  late Animation<Color?> _turnColorAnimation;
 
   @override
   void initState() {
     super.initState();
 
     if (widget.gameHistory != null) {
-      // Restore from history
       currentGame = widget.gameHistory!;
       players = List<String>.from(currentGame.players);
       scores = List<int>.filled(players.length, widget.startingScore);
 
-      // Replay throws to restore scores and finished players
       for (final t in currentGame.throws) {
         final idx = players.indexOf(t.player);
         scores[idx] = t.resultingScore;
@@ -51,16 +55,13 @@ class _GameScreenState extends State<GameScreen> {
         }
       }
 
-      // Set current player and darts thrown
       if (currentGame.throws.isNotEmpty) {
         final lastThrow = currentGame.throws.last;
         currentPlayer = players.indexOf(lastThrow.player);
-        // Count how many darts the current player has thrown in this round
         final playerThrows = currentGame.throws.reversed
             .takeWhile((t) => t.player == lastThrow.player)
             .length;
         dartsThrown = playerThrows % 3;
-        // Move to next player if needed
         if (dartsThrown == 0) {
           do {
             currentPlayer = (currentPlayer + 1) % players.length;
@@ -72,7 +73,6 @@ class _GameScreenState extends State<GameScreen> {
       }
       gameId = currentGame.id;
     } else {
-      // New game
       players = List<String>.from(widget.players);
       players.shuffle(Random());
       scores = List<int>.filled(players.length, widget.startingScore);
@@ -89,6 +89,31 @@ class _GameScreenState extends State<GameScreen> {
       );
       _saveOrUpdateGameHistory();
     }
+
+    _bustController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _bustColorAnimation = ColorTween(
+      begin: Colors.transparent,
+      end: Colors.red.withOpacity(0.7),
+    ).animate(_bustController);
+
+    _turnController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _turnColorAnimation = ColorTween(
+      begin: Colors.transparent,
+      end: Colors.blue.withOpacity(0.7),
+    ).animate(_turnController);
+  }
+
+  @override
+  void dispose() {
+    _bustController.dispose();
+    _turnController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveOrUpdateGameHistory() async {
@@ -106,7 +131,6 @@ class _GameScreenState extends State<GameScreen> {
 
   void _setMultiplier(int value) {
     setState(() {
-      // Toggle off if already selected, otherwise set
       multiplier = (multiplier == value) ? 1 : value;
     });
   }
@@ -114,11 +138,10 @@ class _GameScreenState extends State<GameScreen> {
   void _score(int value) async {
     setState(() {
       if (dartsThrown == 0) {
-        turnStartScore = scores[currentPlayer]; // <-- Add this
+        turnStartScore = scores[currentPlayer];
       }
 
       int hit;
-      // 25 and 50 should not benefit from multiplier
       if (value == 25 || value == 50) {
         hit = value;
       } else {
@@ -134,11 +157,9 @@ class _GameScreenState extends State<GameScreen> {
       bool isBust = false;
       bool isWinningThrow = false;
 
-      // Bust conditions
       if (afterScore < 0 || afterScore == 1) {
         isBust = true;
       } else if (afterScore == 0) {
-        // Must finish on double or bull (50)
         if (isDouble || isBull) {
           isWinningThrow = true;
         } else {
@@ -147,11 +168,8 @@ class _GameScreenState extends State<GameScreen> {
       }
 
       if (isBust) {
-        // Mark all darts this turn as bust (including this one)
-        // Find all throws for this player in this round (max 3, this turn)
         int throwsThisTurn = dartsThrown;
         int throwsFound = 0;
-        // Mark already thrown darts as bust
         for (int i = currentGame.throws.length - 1; i >= 0 && throwsFound < throwsThisTurn; i--) {
           if (currentGame.throws[i].player == players[currentPlayer]) {
             currentGame.throws[i] = DartThrow(
@@ -165,28 +183,40 @@ class _GameScreenState extends State<GameScreen> {
             throwsFound++;
           }
         }
-        // Add bust darts for the remaining (not thrown) darts this turn
         for (int i = throwsThisTurn; i < 3; i++) {
           currentGame.throws.add(DartThrow(
             player: players[currentPlayer],
             value: 0,
             multiplier: 1,
-            resultingScore: turnStartScore, // <-- Use turnStartScore instead of beforeScore
+            resultingScore: turnStartScore,
             timestamp: DateTime.now(),
             wasBust: true,
           ));
         }
-        // Reset score to what it was at the start of the turn
-        scores[currentPlayer] = turnStartScore; // <-- Use turnStartScore instead of beforeScore
+        scores[currentPlayer] = turnStartScore;
         dartsThrown = 0;
-        // Move to next player
-        do {
-          currentPlayer = (currentPlayer + 1) % players.length;
-        } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
-      } else {
-        // Not a bust, apply the score
-        scores[currentPlayer] = afterScore;
 
+        showBust = true;
+        _bustController.forward(from: 0);
+        Future.delayed(const Duration(seconds: 2), () {
+          setState(() {
+            showBust = false;
+            _bustController.reset();
+            showTurnChange = true;
+            _turnController.forward(from: 0);
+            Future.delayed(const Duration(seconds: 2), () {
+              setState(() {
+                showTurnChange = false;
+                _turnController.reset();
+              });
+            });
+            do {
+              currentPlayer = (currentPlayer + 1) % players.length;
+            } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+          });
+        });
+      } else {
+        scores[currentPlayer] = afterScore;
         final dartThrow = DartThrow(
           player: players[currentPlayer],
           value: value,
@@ -199,7 +229,6 @@ class _GameScreenState extends State<GameScreen> {
 
         dartsThrown++;
 
-        // Check if player finished
         if (isWinningThrow && !_finishedPlayers.contains(players[currentPlayer])) {
           _finishedPlayers.add(players[currentPlayer]);
           if (_finishedPlayers.length == players.length) {
@@ -208,20 +237,25 @@ class _GameScreenState extends State<GameScreen> {
           }
           _showWinnerDialog(players[currentPlayer]);
         } else {
-          // Next player if 3 darts thrown
           if (dartsThrown >= 3) {
             dartsThrown = 0;
-            do {
-              currentPlayer = (currentPlayer + 1) % players.length;
-            } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+            showTurnChange = true;
+            _turnController.forward(from: 0);
+            Future.delayed(const Duration(seconds: 2), () {
+              setState(() {
+                showTurnChange = false;
+                _turnController.reset();
+                do {
+                  currentPlayer = (currentPlayer + 1) % players.length;
+                } while (_finishedPlayers.contains(players[currentPlayer]) && _finishedPlayers.length < players.length);
+              });
+            });
           }
         }
       }
 
       currentGame.modifiedAt = DateTime.now();
       _saveOrUpdateGameHistory();
-
-      // Reset multiplier after each throw
       multiplier = 1;
     });
   }
@@ -240,7 +274,6 @@ class _GameScreenState extends State<GameScreen> {
                 ? null
                 : () {
                     Navigator.of(context).pop();
-                    // Continue game for remaining players
                     setState(() {
                       if (_finishedPlayers.length < players.length) {
                         do {
@@ -257,8 +290,8 @@ class _GameScreenState extends State<GameScreen> {
               currentGame.completedAt = DateTime.now();
               await _saveOrUpdateGameHistory();
               if (mounted) {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).popUntil((route) => route.isFirst); // Go to home
+                Navigator.of(context).pop();
+                Navigator.of(context).popUntil((route) => route.isFirst);
               }
             },
             child: const Text('End game'),
@@ -275,9 +308,7 @@ class _GameScreenState extends State<GameScreen> {
       final lastThrow = currentGame.throws.removeLast();
       final playerIdx = players.indexOf(lastThrow.player);
 
-      // Restore the previous score for the player
       int prevScore = widget.startingScore;
-      // Find the last throw for this player, if any
       for (final t in currentGame.throws.reversed) {
         if (t.player == lastThrow.player) {
           prevScore = t.resultingScore;
@@ -286,12 +317,10 @@ class _GameScreenState extends State<GameScreen> {
       }
       scores[playerIdx] = prevScore;
 
-      // Remove from finished players if needed
       if (lastThrow.resultingScore == 0) {
         _finishedPlayers.remove(lastThrow.player);
       }
 
-      // Set current player and darts thrown
       if (currentGame.throws.isNotEmpty) {
         final prev = currentGame.throws.last;
         currentPlayer = players.indexOf(prev.player);
@@ -333,7 +362,6 @@ class _GameScreenState extends State<GameScreen> {
         ),
         body: Column(
           children: [
-            // Current player
             SizedBox(
               height: 40,
               child: Center(
@@ -343,17 +371,61 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
-            // 30% Score
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.3,
-              child: Center(
-                child: Text(
-                  '${scores[currentPlayer]}',
-                  style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
-                ),
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_bustController, _turnController]),
+                builder: (context, child) {
+                  Color? bgColor = Colors.transparent;
+                  if (showBust) {
+                    bgColor = _bustColorAnimation.value;
+                  } else if (showTurnChange) {
+                    bgColor = _turnColorAnimation.value;
+                  }
+                  return Container(
+                    color: bgColor,
+                    child: Center(
+                      child: showBust
+                          ? const Text(
+                              'BUST',
+                              style: TextStyle(
+                                fontSize: 72,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 4,
+                              ),
+                            )
+                          : showTurnChange
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      players[currentPlayer],
+                                      style: const TextStyle(
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      "It's your turn",
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  '${scores[currentPlayer]}',
+                                  style: const TextStyle(fontSize: 72, fontWeight: FontWeight.bold),
+                                ),
+                    ),
+                  );
+                },
               ),
             ),
-            // 10% Possible finishes
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.1,
               child: Center(
@@ -377,12 +449,10 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
-            // 60% Dart input
             Expanded(
-              flex: 6, // 60% of remaining space
+              flex: 6,
               child: Column(
                 children: [
-                  // Multiplier buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -404,7 +474,6 @@ class _GameScreenState extends State<GameScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Number buttons grid and special buttons row
                   Expanded(
                     child: Column(
                       children: [
@@ -417,7 +486,7 @@ class _GameScreenState extends State<GameScreen> {
                               crossAxisSpacing: 8,
                               childAspectRatio: 1.5,
                             ),
-                            itemCount: 22, // 1-20, 25, 50
+                            itemCount: 22,
                             itemBuilder: (context, index) {
                               if (index < 20) {
                                 return ElevatedButton(
