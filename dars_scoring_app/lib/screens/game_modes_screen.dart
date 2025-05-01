@@ -79,6 +79,16 @@ class GameModeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final scale = width / 390; // 390 is a typical mobile width
+
+    // Reusable variables for consistent sizing
+    final double buttonWidth = 240 * scale;
+    final double buttonHeight = 56 * scale;
+    final double buttonFontSize = 22 * scale;
+    final double buttonPaddingV = 16 * scale;
+    final double sectionSpacing = 32 * scale;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Select Game Mode'),
@@ -87,14 +97,30 @@ class GameModeScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(
-              onPressed: () => _onGameModeSelected(context, 501),
-              child: const Text('501'),
+            SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  textStyle: TextStyle(fontSize: buttonFontSize),
+                  padding: EdgeInsets.symmetric(vertical: buttonPaddingV),
+                ),
+                onPressed: () => _onGameModeSelected(context, 501),
+                child: const Text('501'),
+              ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => _onGameModeSelected(context, 301),
-              child: const Text('301'),
+            SizedBox(height: sectionSpacing),
+            SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  textStyle: TextStyle(fontSize: buttonFontSize),
+                  padding: EdgeInsets.symmetric(vertical: buttonPaddingV),
+                ),
+                onPressed: () => _onGameModeSelected(context, 301),
+                child: const Text('301'),
+              ),
             ),
           ],
         ),
