@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.2.2
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -18,3 +19,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/dart-icon.svg

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:dars_scoring_app/models/game_history.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class GameScreen extends StatefulWidget {
   final int startingScore;
@@ -352,27 +353,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       },
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.grey[200], // Light-grey background
           leading: IconButton(
             icon: const Icon(Icons.home, color: Colors.grey),
             onPressed: () {
               Navigator.of(context).popUntil((route) => route.isFirst);
             },
           ),
-          title: Text('Darts Game (${widget.startingScore})'),
+          title: Text(
+            'Darts Game (${widget.startingScore})',
+            style: const TextStyle(color: Colors.black), // Make title text dark for contrast
+          ),
+          iconTheme: const IconThemeData(color: Colors.grey), // Make icons grey
         ),
         body: Column(
           children: [
             SizedBox(
-              height: 40,
+              height: 100,
               child: Center(
                 child: Text(
-                  "Current player: ${players[currentPlayer]} (Dart ${dartsThrown + 1}/3)",
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  "${players[currentPlayer]}",
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.3,
+              height: MediaQuery.of(context).size.height * 0.20,
               child: AnimatedBuilder(
                 animation: Listenable.merge([_bustController, _turnController]),
                 builder: (context, child) {
@@ -424,6 +430,27 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ),
                   );
                 },
+              ),
+            ),
+            SizedBox(
+              height: 40,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  3,
+                  (i) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Opacity(
+                      opacity: i < (3 - dartsThrown) ? 1.0 : 0.2, // faded if dart used
+                      child: SvgPicture.asset(
+                        'assets/icons/dart-icon.svg',
+                        width: 32,
+                        height: 32,
+                        colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
             SizedBox(
@@ -501,7 +528,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               } else {
                                 return ElevatedButton(
                                   onPressed: () => _score(50),
-                                  child: const Text('50', style: TextStyle(fontSize: 16)),
+                                  child: const Text('Bull', style: TextStyle(fontSize: 14)),
                                 );
                               }
                             },
