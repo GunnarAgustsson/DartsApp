@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dars_scoring_app/screens/player_info_screen.dart';
+import 'dart:io';
+import 'package:excel/excel.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:convert'; 
 
 class PlayersScreen extends StatefulWidget {
   const PlayersScreen({super.key});
@@ -86,11 +91,65 @@ class _PlayersScreenState extends State<PlayersScreen> {
     );
   }
 
+  Future<void> _exportPlayersHistoryToExcel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final games = prefs.getStringList('games_history') ?? [];
+    final playersList = prefs.getStringList('players') ?? [];
+
+    final excel = Excel.createExcel();
+    final Sheet sheet = excel['Player History'];
+
+    // Header row
+    sheet.appendRow([
+      'Player',
+      'Game Mode',
+      'Date',
+      'Winner',
+      'Throws (Player, Value, Multiplier, ResultingScore, WasBust)'
+    ]);
+
+    for (final player in playersList) {
+      for (final g in games) {
+        final game = jsonDecode(g) as Map<String, dynamic>;
+        if (!(game['players'] as List).contains(player)) continue;
+        final throws = (game['throws'] as List)
+            .where((t) => t['player'] == player)
+            .map((t) =>
+                '${t['player']},${t['value']},${t['multiplier']},${t['resultingScore']},${t['wasBust'] ?? false}')
+            .join(' | ');
+        sheet.appendRow([
+          player,
+          game['gameMode'] ?? '',
+          game['createdAt'] ?? '',
+          game['winner'] ?? '',
+          throws,
+        ]);
+      }
+    }
+
+    final bytes = excel.encode();
+    if (bytes == null) return;
+
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/players_history.xlsx');
+    await file.writeAsBytes(bytes);
+
+    // Optionally, share the file or show a snackbar
+    await Share.shareXFiles([XFile(file.path)], text: 'Darts Players History Export');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Players'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            tooltip: 'Export All Players History',
+            onPressed: _exportPlayersHistoryToExcel,
+          ),
+        ],
       ),
       body: Column(
         children: [
