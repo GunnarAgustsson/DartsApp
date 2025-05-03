@@ -504,7 +504,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           children: List.generate(5, (col) {
                             int number = row * 5 + col + 1;
                             return Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4 * scale),
+                              padding: EdgeInsets.symmetric(horizontal: 3 * scale),
                               child: SizedBox(
                                 width: gridButtonWidth,
                                 height: gridButtonHeight,
@@ -647,26 +647,63 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDartIcons(BuildContext context, {double iconSize = 32}) {
+    // grab up to the last 3 throws for the current player in this turn
+    final recent = currentGame.throws.reversed
+      .takeWhile((t) => t.player == players[currentPlayer])  // stop at first other-player throw
+      .take(3)                                             // max 3 throws
+      .toList()
+      .reversed
+      .toList();
+
+    final int shown = recent.length;
+    final int totalSlots = 3;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        3,
-        (i) => Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
-          child: Opacity(
-            opacity: i < (3 - dartsThrown) ? 1.0 : 0.2,
+      children: [
+        // render each throw as text
+        for (var t in recent) ...[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
+            child: Text(
+              // build label: M, 13, D15, T20, Bull…
+              t.value == 0
+                ? 'M'
+                : t.value == 50
+                  ? 'Bull'
+                  : t.multiplier == 2
+                    ? 'D${t.value}'
+                    : t.multiplier == 3
+                      ? 'T${t.value}'
+                      : '${t.value}',
+              style: TextStyle(
+                fontSize: iconSize * 0.8,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
+            ),
+          )
+        ],
+        // fill remaining slots with dart icons
+        for (int i = shown; i < totalSlots; i++) ...[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
             child: SvgPicture.asset(
               'assets/icons/dart-icon.svg',
               width: iconSize,
               height: iconSize,
               colorFilter: ColorFilter.mode(
-                Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
                 BlendMode.srcIn,
               ),
             ),
-          ),
-        ),
-      ),
+          )
+        ]
+      ],
     );
   }
 
@@ -723,19 +760,27 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        shortenName(players[nextPlayer], maxLength: 12),
+                        '${players[currentPlayer]} scored: ${_lastTurnPoints()}',
                         style: TextStyle(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(
-                        "It's your turn",
+                        _lastTurnLabels(),
                         style: TextStyle(
                           fontSize: turnTextFontSize,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 8 * (turnNameFontSize / 40)),
+                      Text(
+                        '${players[nextPlayer]} it\'s your turn!',
+                        style: TextStyle(
+                          fontSize: turnNameFontSize,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
@@ -755,5 +800,33 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       onPressed: (isTurnChanging || showBust) ? null : () => _score(value),
       child: Text(label ?? '$value', style: TextStyle(fontSize: fontSize)),
     );
+  }
+
+  int _lastTurnPoints() {
+    final prev = players[currentPlayer];
+    final lastThrows = currentGame.throws.reversed
+      .takeWhile((t) => t.player == prev)  // up to turn boundary
+      .take(3)
+      .toList();
+    return lastThrows.fold(0, (sum, t) {
+      final hit = (t.value == 25 || t.value == 50) ? t.value : t.value * t.multiplier;
+      return sum + hit;
+    });
+  }
+
+  String _lastTurnLabels() {
+    final prev = players[currentPlayer];
+    final last = currentGame.throws.reversed
+      .takeWhile((t) => t.player == prev)
+      .take(3)
+      .toList()
+      .reversed;
+    return last.map((t) {
+      if (t.value == 0) return 'M';
+      if (t.value == 50) return 'Bull';
+      if (t.multiplier == 2) return 'D${t.value}';
+      if (t.multiplier == 3) return 'T${t.value}';
+      return '${t.value}';
+    }).join(' ');
   }
 }

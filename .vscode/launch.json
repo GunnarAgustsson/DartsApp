@@ -19,6 +19,13 @@
             "flutterMode": "profile"
         },
         {
+            "name": "dars_scoring_app (debug mode)",
+            "cwd": "dars_scoring_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug"
+        },
+        {
             "name": "dars_scoring_app (release mode)",
             "cwd": "dars_scoring_app",
             "request": "launch",
