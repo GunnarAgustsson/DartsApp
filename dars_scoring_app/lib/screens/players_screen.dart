@@ -92,50 +92,79 @@ class _PlayersScreenState extends State<PlayersScreen> {
   }
 
   Future<void> _exportPlayersHistoryToExcel() async {
+    // 1. Load persisted games and players
     final prefs = await SharedPreferences.getInstance();
-    final games = prefs.getStringList('games_history') ?? [];
+    final rawGames = prefs.getStringList('games_history') ?? [];
     final playersList = prefs.getStringList('players') ?? [];
 
-    final excel = Excel.createExcel();
-    final Sheet sheet = excel['Player History'];
+    // 2. Decode JSON and filter only completed games
+    final completedGames = rawGames
+        .map((g) => jsonDecode(g) as Map<String, dynamic>)
+        .where((game) => game['completedAt'] != null)
+        .toList();
 
-    // Header row
+    if (completedGames.isEmpty || playersList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No completed games or players to export.')),
+      );
+      return;
+    }
+
+    // 3. Create an Excel workbook and sheet
+    final excel = Excel.createExcel();
+    final String sheetName = 'Player History';
+    final Sheet sheet = excel[sheetName];
+
+    // 4. Append header row
     sheet.appendRow([
-      'Player',
-      'Game Mode',
-      'Date',
-      'Winner',
-      'Throws (Player, Value, Multiplier, ResultingScore, WasBust)'
+      TextCellValue('Player'),
+      TextCellValue('Game Mode'),
+      TextCellValue('Date'),
+      TextCellValue('Winner'),
+      TextCellValue('Throws (player,value,mult,resultScore,bust)'),
     ]);
 
+    // 5. Populate rows
     for (final player in playersList) {
-      for (final g in games) {
-        final game = jsonDecode(g) as Map<String, dynamic>;
-        if (!(game['players'] as List).contains(player)) continue;
+      for (final game in completedGames) {
+        final playersInGame = (game['players'] as List).cast<String>();
+        if (!playersInGame.contains(player)) continue;
+
         final throws = (game['throws'] as List)
             .where((t) => t['player'] == player)
             .map((t) =>
                 '${t['player']},${t['value']},${t['multiplier']},${t['resultingScore']},${t['wasBust'] ?? false}')
             .join(' | ');
+
         sheet.appendRow([
-          player,
-          game['gameMode'] ?? '',
-          game['createdAt'] ?? '',
-          game['winner'] ?? '',
-          throws,
+          TextCellValue(player),
+          TextCellValue(game['gameMode']?.toString() ?? ''),
+          TextCellValue(game['createdAt']?.toString() ?? ''),
+          TextCellValue(game['winner']?.toString() ?? ''),
+          TextCellValue(throws),
         ]);
       }
     }
 
-    final bytes = excel.encode();
-    if (bytes == null) return;
+    // 6. Save to a temporary file
+    final List<int>? bytes = excel.encode();
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to generate Excel file.')),
+      );
+      return;
+    }
 
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/players_history.xlsx');
-    await file.writeAsBytes(bytes);
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/players_history.xlsx';
+    final file = File(filePath);
+    await file.writeAsBytes(bytes, flush: true);
 
-    // Optionally, share the file or show a snackbar
-    await Share.shareXFiles([XFile(file.path)], text: 'Darts Players History Export');
+    // 7. Share the file
+    await Share.shareXFiles(
+      [XFile(filePath)],
+      text: 'Darts Players History Export',
+    );
   }
 
   @override
