@@ -7,6 +7,8 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/screens/options_screen.dart'; // for CheckoutRule
+import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class GameScreen extends StatefulWidget {
   final int startingScore;
@@ -44,6 +46,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int? _pendingNextPlayer;
   bool _showNextList = false;
   late CheckoutRule _checkoutRule;
+  late AudioPlayer _audioPlayer;
 
   @override
   void initState() {
@@ -120,6 +123,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _checkoutRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? 0];
       });
     });
+
+    _audioPlayer = AudioPlayer();
   }
 
   @override
@@ -162,6 +167,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _score(int value) async {
+    
+    HapticFeedback.lightImpact();
+
+    _audioPlayer.play(AssetSource('sound/dart_throw.mp3'), volume: 0.5);
+
     setState(() {
       if (dartsThrown == 0) {
         turnStartScore = scores[currentPlayer];
@@ -765,19 +775,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDartIcons(BuildContext context, {double iconSize = 32}) {
-    final recent = currentGame.throws.reversed
-      .takeWhile((t) => t.player == players[currentPlayer])
-      .take(3)
-      .toList()
-      .reversed
-      .toList();
+    final name = players[currentPlayer];
+    // use dartsThrown to know how many this turn
+    final int used = dartsThrown.clamp(0, 3);
+    final int remaining = 3 - used;
 
-    final int shown = recent.length;
-    final int totalSlots = 3;
+    // grab this player's throws and take the last [used] of them
+    final allThrows = currentGame.throws
+        .where((t) => t.player == name)
+        .toList();
+    final recent = allThrows.length >= used
+        ? allThrows.sublist(allThrows.length - used)
+        : allThrows;
+
+    final activeTextStyle = TextStyle(
+      fontSize: iconSize * 0.8,
+      fontWeight: FontWeight.bold,
+      color: Theme.of(context).primaryColor,
+    );
+    final iconColor = Theme.of(context).primaryColor;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // show used darts as their score labels
         for (var t in recent) ...[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
@@ -785,38 +806,28 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               t.value == 0
                 ? 'M'
                 : t.value == 50
-                  ? 'Bull'
+                  ? 'BULL'
                   : t.multiplier == 2
                     ? 'D${t.value}'
                     : t.multiplier == 3
                       ? 'T${t.value}'
                       : '${t.value}',
-              style: TextStyle(
-                fontSize: iconSize * 0.8,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
-              ),
+              style: activeTextStyle,
             ),
-          )
+          ),
         ],
-        for (int i = shown; i < totalSlots; i++) ...[
+        // show remaining darts as icons
+        for (int i = 0; i < remaining; i++) ...[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
             child: SvgPicture.asset(
               'assets/icons/dart-icon.svg',
               width: iconSize,
               height: iconSize,
-              colorFilter: ColorFilter.mode(
-                Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
-                BlendMode.srcIn,
-              ),
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
             ),
-          )
-        ]
+          ),
+        ],
       ],
     );
   }

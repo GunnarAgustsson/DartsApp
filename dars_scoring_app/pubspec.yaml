@@ -9,10 +9,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  audioplayers: ^6.4.0
+
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.2.2
   flutter_lints: ^5.0.0
+
   flutter_svg: ^2.0.10
+
   fl_chart: ^0.71.0
   excel: ^4.0.6
   path_provider: ^2.0.0
@@ -28,6 +33,7 @@ flutter:
   assets:
     - assets/icons/dart-icon.svg
     - assets/icons/dartboard.png
+    - assets/sound/dart_throw.mp3
 
 flutter_icons:
   android: true

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
-import 'theme.dart'; // Add this import
+import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
