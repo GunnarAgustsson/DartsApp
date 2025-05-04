@@ -41,6 +41,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late Animation<Color?> _turnColorAnimation;
   bool isTurnChanging = false;
   int? _pendingNextPlayer;
+  bool _showNextList = false;
 
   @override
   void initState() {
@@ -375,22 +376,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final width = size.width;
-    final height = size.height;
-    // Calculate scale based on both width and height, use the smaller one
+    final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
     final double widthScale = width / 390;   // 390 is a typical mobile width
     final double heightScale = height / 844; // 844 is a typical mobile height
     final double scale = widthScale < heightScale ? widthScale : heightScale;
 
-    // Define all main sizes and paddings using scale
     final double playerCardHeight = height * 0.35;
     final double gridButtonHeight = 42 * scale;
     final double gridButtonWidth = 72 * scale;
     final double sectionSpacing = 10 * scale;
     final double betweenButtonSpacing = 10 * scale;
 
-    // Font sizes
     final double playerNameFontSize = 32 * scale;
     final double playerScoreFontSize = 64 * scale;
     final double dartIconSize = 32 * scale;
@@ -399,7 +396,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final double overlayTurnNameFontSize = 40 * scale;
     final double overlayTurnTextFontSize = 28 * scale;
     final double scoreButtonFontSize = 18 * scale;
-    // Button sizes for special buttons
+
     final double multiplierButtonWidth = 96 * scale;
     final double multiplierButtonHeight = 52 * scale;
     final double multiplierButtonFontSize = 20 * scale;
@@ -409,193 +406,255 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final double missUndoButtonFontSize = 16 * scale;
     final double missUndoIconSize = 16 * scale;
 
+    final ordered = List.generate(players.length, (i) => (currentPlayer + 1 + i) % players.length);
+    final nextIndex = ordered.first;
+
     return PopScope(
-      onPopInvokedWithResult: (dynamic disposition, dynamic result) {
-        if (disposition == 'bubble') { // Replace with appropriate logic or value
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.grey[200],
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[900]
+              : Colors.grey[200],
           leading: IconButton(
-            icon: Icon(Icons.home, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey),
-            onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
+            icon: Icon(Icons.home,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.grey),
+            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
           ),
-          title: Text(
-            'Darts Game (${widget.startingScore})',
-            style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-          ),
-          iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              SizedBox(height: sectionSpacing), // Add this line for padding above the player info card
-              SizedBox(
-                height: playerCardHeight,
-                child: Stack(
-                  children: [
-                    _buildPlayerInfoCard(
-                      context,
-                      playerNameFontSize: playerNameFontSize,
-                      playerScoreFontSize: playerScoreFontSize,
-                      dartIconSize: dartIconSize,
-                      possibleFinishFontSize: possibleFinishFontSize,
-                    ),
-                    if (showBust || showTurnChange)
-                      Positioned.fill(
-                        child: AnimatedBuilder(
-                          animation: Listenable.merge([_bustController, _turnController]),
-                          builder: (context, child) => _buildOverlayAnimation(
-                            bustFontSize: overlayBustFontSize,
-                            turnNameFontSize: overlayTurnNameFontSize,
-                            turnTextFontSize: overlayTurnTextFontSize,
-                          ),
-                        ),
-                      ),
-                  ],
+          title: const SizedBox.shrink(), // no centered title
+          iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white70
+                  : Colors.grey),
+          actions: [
+            GestureDetector(
+              onTap: () => setState(() => _showNextList = !_showNextList),
+              child: Padding(
+                padding: EdgeInsets.only(right: 16 * scale),
+                child: Center(
+                  child: Text(
+                    'Next: ${players[nextIndex]} (${scores[nextIndex]})',
+                    style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black),
+                  ),
                 ),
               ),
-              Expanded(
-                flex: 6,
-                child: Column(
-                  children: [
-                    SizedBox(height: sectionSpacing),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  SizedBox(height: sectionSpacing),
+                  SizedBox(
+                    height: playerCardHeight,
+                    child: Stack(
                       children: [
-                        SizedBox(
-                          width: multiplierButtonWidth,
-                          height: multiplierButtonHeight,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: multiplier == 2 ? Colors.blue : null,
-                              textStyle: TextStyle(fontSize: multiplierButtonFontSize),
-                            ),
-                            onPressed: () => _setMultiplier(2),
-                            child: const Text('x2'),
-                          ),
+                        _buildPlayerInfoCard(
+                          context,
+                          playerNameFontSize: playerNameFontSize,
+                          playerScoreFontSize: playerScoreFontSize,
+                          dartIconSize: dartIconSize,
+                          possibleFinishFontSize: possibleFinishFontSize,
                         ),
-                        SizedBox(width: betweenButtonSpacing),
-                        SizedBox(
-                          width: multiplierButtonWidth,
-                          height: multiplierButtonHeight,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: multiplier == 3 ? Colors.blue : null,
-                              textStyle: TextStyle(fontSize: multiplierButtonFontSize),
+                        if (showBust || showTurnChange)
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_bustController, _turnController]),
+                              builder: (context, child) => _buildOverlayAnimation(
+                                bustFontSize: overlayBustFontSize,
+                                turnNameFontSize: overlayTurnNameFontSize,
+                                turnTextFontSize: overlayTurnTextFontSize,
+                              ),
                             ),
-                            onPressed: () => _setMultiplier(3),
-                            child: const Text('x3'),
                           ),
-                        ),
                       ],
                     ),
-                    SizedBox(height: sectionSpacing),
-                    // 4 rows of 5 buttons (1-20)
-                    ...List.generate(4, (row) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: betweenButtonSpacing),
-                        child: Row(
+                  ),
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      children: [
+                        SizedBox(height: sectionSpacing),
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (col) {
-                            int number = row * 5 + col + 1;
-                            return Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 3 * scale),
-                              child: SizedBox(
+                          children: [
+                            SizedBox(
+                              width: multiplierButtonWidth,
+                              height: multiplierButtonHeight,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: multiplier == 2 ? Colors.blue : null,
+                                  textStyle: TextStyle(fontSize: multiplierButtonFontSize),
+                                ),
+                                onPressed: () => _setMultiplier(2),
+                                child: const Text('x2'),
+                              ),
+                            ),
+                            SizedBox(width: betweenButtonSpacing),
+                            SizedBox(
+                              width: multiplierButtonWidth,
+                              height: multiplierButtonHeight,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: multiplier == 3 ? Colors.blue : null,
+                                  textStyle: TextStyle(fontSize: multiplierButtonFontSize),
+                                ),
+                                onPressed: () => _setMultiplier(3),
+                                child: const Text('x3'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: sectionSpacing),
+                        ...List.generate(4, (row) {
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: betweenButtonSpacing),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(5, (col) {
+                                int number = row * 5 + col + 1;
+                                return Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 3 * scale),
+                                  child: SizedBox(
+                                    width: gridButtonWidth,
+                                    height: gridButtonHeight,
+                                    child: _buildScoreButton(
+                                      number,
+                                      fontSize: scoreButtonFontSize,
+                                      scale: scale,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                          );
+                        }),
+                        Padding(
+                          padding: EdgeInsets.only(bottom: sectionSpacing),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: gridButtonWidth + 8 * scale),
+                              SizedBox(
                                 width: gridButtonWidth,
                                 height: gridButtonHeight,
                                 child: _buildScoreButton(
-                                  number,
+                                  25,
+                                  label: '25',
                                   fontSize: scoreButtonFontSize,
                                   scale: scale,
                                 ),
                               ),
-                            );
-                          }),
+                              SizedBox(width: 8 * scale),
+                              SizedBox(
+                                width: gridButtonWidth,
+                                height: gridButtonHeight,
+                                child: _buildScoreButton(
+                                  50,
+                                  label: 'Bull',
+                                  fontSize: scoreButtonFontSize * 0.85,
+                                  scale: scale,
+                                ),
+                              ),
+                              SizedBox(width: gridButtonWidth + 8 * scale),
+                            ],
+                          ),
                         ),
+                        SizedBox(height: sectionSpacing * 2),
+                        Padding(
+                          padding: EdgeInsets.only(top: 0, bottom: 24 * scale),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: missUndoButtonWidth,
+                                height: missUndoButtonHeight,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    textStyle: TextStyle(fontSize: missUndoButtonFontSize),
+                                  ),
+                                  onPressed: (isTurnChanging || showBust) ? null : () => _score(0),
+                                  icon: Icon(Icons.cancel_outlined, size: missUndoIconSize),
+                                  label: const Text('Miss'),
+                                ),
+                              ),
+                              SizedBox(width: betweenButtonSpacing),
+                              SizedBox(
+                                width: missUndoButtonWidth,
+                                height: missUndoButtonHeight,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    textStyle: TextStyle(fontSize: missUndoButtonFontSize),
+                                    padding: EdgeInsets.symmetric(horizontal: 8 * scale),
+                                  ),
+                                  onPressed: (isTurnChanging || showBust) ? null : _undoLastThrow,
+                                  icon: Icon(Icons.undo, size: missUndoIconSize),
+                                  label: const Text('Undo'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_showNextList)
+              Positioned(
+                top: kToolbarHeight,
+                left: 16 * scale,
+                right: 16 * scale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(8 * scale),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: players.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final name = shortenName(entry.value, maxLength: 12);
+                      final pts = scores[idx];
+                      final isCurrent = idx == currentPlayer;
+                      final nextIndex = (currentPlayer + 1) % players.length;
+                      final isUpcoming = idx == nextIndex;
+
+                      return ListTile(
+                        dense: true,
+                        leading: isCurrent
+                            ? Icon(Icons.arrow_right, color: Colors.green)
+                            : SizedBox(width: 24 * scale),
+                        title: Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                            color: isUpcoming
+                                ? Colors.blue       // upcoming in blue
+                                : isCurrent
+                                    ? Colors.green    // current in green
+                                    : null,           // others default
+                          ),
+                        ),
+                        trailing: Text('$pts'),
+                        onTap: () => setState(() => _showNextList = false),
                       );
-                    }),
-                    // Centered 25 and Bull buttons
-                    Padding(
-                      padding: EdgeInsets.only(bottom: sectionSpacing),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(width: gridButtonWidth + 8 * scale), // Spacer
-                          SizedBox(
-                            width: gridButtonWidth,
-                            height: gridButtonHeight,
-                            child: _buildScoreButton(
-                              25,
-                              label: '25',
-                              fontSize: scoreButtonFontSize,
-                              scale: scale,
-                            ),
-                          ),
-                          SizedBox(width: 8 * scale),
-                          SizedBox(
-                            width: gridButtonWidth,
-                            height: gridButtonHeight,
-                            child: _buildScoreButton(
-                              50,
-                              label: 'Bull',
-                              fontSize: scoreButtonFontSize * 0.85,
-                              scale: scale,
-                            ),
-                          ),
-                          SizedBox(width: gridButtonWidth + 8 * scale), // Spacer
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: sectionSpacing * 2),
-                    // Miss and Undo buttons at the bottom
-                    Padding(
-                      padding: EdgeInsets.only(top: 0, bottom: 24 * scale),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: missUndoButtonWidth,
-                            height: missUndoButtonHeight,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                textStyle: TextStyle(fontSize: missUndoButtonFontSize),
-                              ),
-                              onPressed: (isTurnChanging || showBust) ? null : () => _score(0),
-                              icon: Icon(Icons.cancel_outlined, size: missUndoIconSize),
-                              label: const Text('Miss'),
-                            ),
-                          ),
-                          SizedBox(width: betweenButtonSpacing),
-                          SizedBox(
-                            width: missUndoButtonWidth,
-                            height: missUndoButtonHeight,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                textStyle: TextStyle(fontSize: missUndoButtonFontSize),
-                                padding: EdgeInsets.symmetric(horizontal: 8 * scale),
-                              ),
-                              onPressed: (isTurnChanging || showBust) ? null : _undoLastThrow,
-                              icon: Icon(Icons.undo, size: missUndoIconSize),
-                              label: const Text('Undo'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    }).toList(),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -647,10 +706,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDartIcons(BuildContext context, {double iconSize = 32}) {
-    // grab up to the last 3 throws for the current player in this turn
     final recent = currentGame.throws.reversed
-      .takeWhile((t) => t.player == players[currentPlayer])  // stop at first other-player throw
-      .take(3)                                             // max 3 throws
+      .takeWhile((t) => t.player == players[currentPlayer])
+      .take(3)
       .toList()
       .reversed
       .toList();
@@ -661,7 +719,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // render each throw as text
         for (var t in recent) ...[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
@@ -685,7 +742,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           )
         ],
-        // fill remaining slots with dart icons
         for (int i = shown; i < totalSlots; i++) ...[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
@@ -804,7 +860,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _lastTurnPoints() {
     final prev = players[currentPlayer];
     final lastThrows = currentGame.throws.reversed
-      .takeWhile((t) => t.player == prev)  // up to turn boundary
+      .takeWhile((t) => t.player == prev)
       .take(3)
       .toList();
     return lastThrows.fold(0, (sum, t) {
