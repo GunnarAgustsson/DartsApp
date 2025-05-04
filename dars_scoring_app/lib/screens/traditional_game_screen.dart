@@ -6,6 +6,7 @@ import 'package:dars_scoring_app/models/game_history.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
+import 'package:dars_scoring_app/screens/options_screen.dart'; // for CheckoutRule
 
 class GameScreen extends StatefulWidget {
   final int startingScore;
@@ -42,6 +43,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   bool isTurnChanging = false;
   int? _pendingNextPlayer;
   bool _showNextList = false;
+  late CheckoutRule _checkoutRule;
 
   @override
   void initState() {
@@ -112,6 +114,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       begin: Colors.blue, 
       end: Colors.blue,   
     ).animate(_turnController);
+
+    SharedPreferences.getInstance().then((prefs) {
+      setState(() {
+        _checkoutRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? 0];
+      });
+    });
   }
 
   @override
@@ -140,6 +148,19 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     });
   }
 
+  String _checkoutRuleLabel(CheckoutRule rule) {
+    switch (rule) {
+      case CheckoutRule.doubleOut:
+        return 'Standard Double-Out';
+      case CheckoutRule.extendedOut:
+        return 'Extended Out';
+      case CheckoutRule.exactOut:
+        return 'Exactly 0';
+      case CheckoutRule.openFinish:
+        return 'Open Finish';
+    }
+  }
+
   void _score(int value) async {
     setState(() {
       if (dartsThrown == 0) {
@@ -162,14 +183,37 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       bool isBust = false;
       bool isWinningThrow = false;
 
-      if (afterScore < 0 || afterScore == 1) {
-        isBust = true;
-      } else if (afterScore == 0) {
-        if (isDouble || isBull) {
-          isWinningThrow = true;
-        } else {
-          isBust = true;
-        }
+      switch (_checkoutRule) {
+        case CheckoutRule.doubleOut:
+          if (afterScore < 0 || afterScore == 1) {
+            isBust = true;
+          } else if (afterScore == 0 && !(isDouble || isBull)) {
+            isBust = true;
+          } else if (afterScore == 0) {
+            isWinningThrow = true;
+          }
+          break;
+        case CheckoutRule.extendedOut:
+          if (afterScore < 0 || afterScore == 1) {
+            isBust = true;
+          } else if (afterScore == 0 && !(isDouble || isBull || multiplier == 3)) {
+            isBust = true;
+          } else if (afterScore == 0) {
+            isWinningThrow = true;
+          }
+          break;
+        case CheckoutRule.exactOut:
+          if (afterScore < 0 || afterScore == 1) {
+            isBust = true;
+          } else if (afterScore == 0) {
+            isWinningThrow = true;
+          }
+          break;
+        case CheckoutRule.openFinish:
+          if (afterScore <= 0) {
+            isWinningThrow = true;
+          }
+          break;
       }
 
       if (isBust) {
@@ -408,6 +452,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     final ordered = List.generate(players.length, (i) => (currentPlayer + 1 + i) % players.length);
     final nextIndex = ordered.first;
+    final gameLabel = '${widget.startingScore} (${_checkoutRuleLabel(_checkoutRule)})';
 
     return PopScope(
       child: Scaffold(
@@ -415,12 +460,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           backgroundColor: Theme.of(context).brightness == Brightness.dark
               ? Colors.grey[900]
               : Colors.grey[200],
-          leading: IconButton(
-            icon: Icon(Icons.home,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.grey),
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.home,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white70
+                        : Colors.grey),
+                onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              ),
+              Text(
+                gameLabel,
+                style: TextStyle(
+                  fontSize: 16 * scale,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70
+                      : Colors.black87,
+                ),
+              ),
+            ],
           ),
           title: const SizedBox.shrink(), // no centered title
           iconTheme: IconThemeData(
@@ -641,10 +700,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           style: TextStyle(
                             fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                             color: isUpcoming
-                                ? Colors.blue       // upcoming in blue
+                                ? Colors.blue       
                                 : isCurrent
-                                    ? Colors.green    // current in green
-                                    : null,           // others default
+                                    ? Colors.green    
+                                    : null,           
                           ),
                         ),
                         trailing: Text('$pts'),
