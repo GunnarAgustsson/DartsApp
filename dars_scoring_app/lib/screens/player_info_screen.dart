@@ -53,10 +53,12 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
     Map<int, int> hitCount = {};
     List<bool> lastResults = [];
 
-    // For winrate, count all games using the winner variable
+    // For winrate, count only completed games
     for (final g in games.reversed) {
       final game = jsonDecode(g);
       if (!(game['players'] as List).contains(widget.playerName)) continue;
+      // skip games still in progress
+      if (game['completedAt'] == null) continue;
       totalGames++;
       if (game['winner'] == widget.playerName) {
         wins++;
@@ -138,12 +140,14 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
     for (final entry in hitHeatmap.entries) {
       filtered[entry.key] = 0;
     }
-    for (final g in lastGames) {
+
+    // Only include games that have a non‐null completedAt
+    for (final g in lastGames.where((g) => g['completedAt'] != null)) {
       // collect only this player's throws
       var throwsList = (g['throws'] as List)
           .where((t) => t['player'] == widget.playerName)
           .toList();
-      // apply hit‑type filter
+      // apply hit-type filter
       throwsList = throwsList.where((t) {
         final m = t['multiplier'] ?? 1;
         return filter == HitTypeFilter.all ||
@@ -151,7 +155,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
             (filter == HitTypeFilter.doubles && m == 2) ||
             (filter == HitTypeFilter.triples && m == 3);
       }).toList();
-      // apply dart‑count filter
+      // apply dart-count filter
       switch (_selectedCountFilter) {
         case DartCountFilter.first9:
           throwsList = throwsList.take(9).toList();
@@ -170,6 +174,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
         filtered[v] = (filtered[v] ?? 0) + 1;
       }
     }
+
     return filtered;
   }
 
