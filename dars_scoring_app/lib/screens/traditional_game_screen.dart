@@ -666,7 +666,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4 * (iconSize / 32)),
             child: Text(
-              // build label: M, 13, D15, T20, Bull…
               t.value == 0
                 ? 'M'
                 : t.value == 50

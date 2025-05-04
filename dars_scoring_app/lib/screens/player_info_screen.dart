@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:dars_scoring_app/widgets/spiderweb_painter.dart';
 
 enum HitTypeFilter { all, singles, doubles, triples }
+enum DartCountFilter { all, first9, first12 }
 
 class PlayerInfoScreen extends StatefulWidget {
   final String playerName;
@@ -28,6 +29,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
   int mostHitCount = 0;
   List<bool> recentResults = []; // true = win, false = loss
   HitTypeFilter _selectedFilter = HitTypeFilter.all;
+  DartCountFilter _selectedCountFilter = DartCountFilter.all;
   final ScrollController _heatmapScrollController = ScrollController();
 
   @override
@@ -137,19 +139,35 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
       filtered[entry.key] = 0;
     }
     for (final g in lastGames) {
-      final throws = (g['throws'] as List)
+      // collect only this player's throws
+      var throwsList = (g['throws'] as List)
           .where((t) => t['player'] == widget.playerName)
           .toList();
-      for (final t in throws) {
+      // apply hit‑type filter
+      throwsList = throwsList.where((t) {
+        final m = t['multiplier'] ?? 1;
+        return filter == HitTypeFilter.all ||
+            (filter == HitTypeFilter.singles && m == 1) ||
+            (filter == HitTypeFilter.doubles && m == 2) ||
+            (filter == HitTypeFilter.triples && m == 3);
+      }).toList();
+      // apply dart‑count filter
+      switch (_selectedCountFilter) {
+        case DartCountFilter.first9:
+          throwsList = throwsList.take(9).toList();
+          break;
+        case DartCountFilter.first12:
+          throwsList = throwsList.take(12).toList();
+          break;
+        case DartCountFilter.all:
+        default:
+          break;
+      }
+      // tally heatmap
+      for (final t in throwsList) {
         if (t['wasBust'] == true) continue;
-        final value = t['value'] ?? 0;
-        final multiplier = t['multiplier'] ?? 1;
-        if (filter == HitTypeFilter.all ||
-            (filter == HitTypeFilter.singles && multiplier == 1) ||
-            (filter == HitTypeFilter.doubles && multiplier == 2) ||
-            (filter == HitTypeFilter.triples && multiplier == 3)) {
-          filtered[value] = (filtered[value] ?? 0) + 1;
-        }
+        final v = t['value'] ?? 0;
+        filtered[v] = (filtered[v] ?? 0) + 1;
       }
     }
     return filtered;
@@ -292,6 +310,29 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                   label: Text('Triples', style: TextStyle(fontSize: 14 * scale)),
                   selected: _selectedFilter == HitTypeFilter.triples,
                   onSelected: (_) => setState(() => _selectedFilter = HitTypeFilter.triples),
+                ),
+              ],
+            ),
+            SizedBox(height: 12 * scale),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: Text('All', style: TextStyle(fontSize: 14 * scale)),
+                  selected: _selectedCountFilter == DartCountFilter.all,
+                  onSelected: (_) => setState(() => _selectedCountFilter = DartCountFilter.all),
+                ),
+                SizedBox(width: 8 * scale),
+                ChoiceChip(
+                  label: Text('First 9', style: TextStyle(fontSize: 14 * scale)),
+                  selected: _selectedCountFilter == DartCountFilter.first9,
+                  onSelected: (_) => setState(() => _selectedCountFilter = DartCountFilter.first9),
+                ),
+                SizedBox(width: 8 * scale),
+                ChoiceChip(
+                  label: Text('First 12', style: TextStyle(fontSize: 14 * scale)),
+                  selected: _selectedCountFilter == DartCountFilter.first12,
+                  onSelected: (_) => setState(() => _selectedCountFilter = DartCountFilter.first12),
                 ),
               ],
             ),
