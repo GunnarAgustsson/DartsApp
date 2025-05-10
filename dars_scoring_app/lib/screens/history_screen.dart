@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'traditional_game_screen.dart';
-import 'package:dars_scoring_app/utils/string_utils.dart';
 import '../models/game_history.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -13,7 +12,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> games = [];
+  List<GameHistory> games = [];
 
   @override
   void initState() {
@@ -23,105 +22,84 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _loadGames() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String> gamesRaw = prefs.getStringList('games_history') ?? [];
+    final raw = prefs.getStringList('games_history') ?? [];
     setState(() {
-      games = gamesRaw.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+      games = raw.map((e) => GameHistory.fromJson(jsonDecode(e))).toList();
     });
   }
 
-  String _getGameMode(Map<String, dynamic> game) {
-    return game['gameMode']?.toString() ?? 'Unknown';
-  }
-
-  void _showGameDetailsDialog(Map<String, dynamic> game) {
-    final throws = (game['throws'] as List)
-        .map((t) => {
-              'player': t['player'],
-              'value': t['value'],
-              'multiplier': t['multiplier'],
-              'resultingScore': t['resultingScore'],
-              'wasBust': t['wasBust'] ?? false,
-            })
-        .toList();
-    final isCompleted = game['completedAt'] != null;
-    final players = (game['players'] as List).cast<String>();
-    final startingScore = _getGameMode(game) == '501'
-        ? 501
-        : _getGameMode(game) == '301'
-            ? 301
-            : 501;
+  void _showGameDetailsDialog(GameHistory game) {
+    final wasCompleted = game.completedAt != null;
+    final throws = game.throws;
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Game Details'),
-              if (isCompleted && game['winner'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Winner: ${game['winner']}',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+      builder: (_) => AlertDialog(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Game Details'),
+            if (wasCompleted && game.winner != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Winner: ${game.winner}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: throws.length,
-                itemBuilder: (context, index) {
-                  final t = throws[index];
-                  return ListTile(
-                    dense: true,
-                    title: Text('${t['player']}'),
-                    subtitle: t['wasBust'] == true
-                        ? Text(
-                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}  (Bust)',
-                            style: const TextStyle(color: Colors.red),
-                          )
-                        : Text(
-                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}',
-                          ),
-                  );
-                },
               ),
-            ),
-          ),
-          actions: [
-            if (!isCompleted)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => GameScreen(
-                        startingScore: startingScore,
-                        players: players,
-                        gameHistory: GameHistory.fromJson(game), // <-- Pass the loaded game
-                      ),
-                    ),
-                  );
-                },
-                child: const Text('Continue Game'),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
           ],
-        );
-      },
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Scrollbar(
+            thumbVisibility: true,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: throws.length,
+              itemBuilder: (_, i) {
+                final t = throws[i];
+                return ListTile(
+                  dense: true,
+                  title: Text(t.player),
+                  subtitle: Text(
+                    'Hit: ${t.value} x${t.multiplier} | '
+                    'Score after: ${t.resultingScore}'
+                    '${t.wasBust ? '  (Bust)' : ''}',
+                    style: t.wasBust
+                        ? const TextStyle(color: Colors.red)
+                        : null,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        actions: [
+          if (!wasCompleted)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GameScreen(
+                      startingScore: game.gameMode,
+                      players: game.players,
+                      gameHistory: game,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Continue Game'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -133,43 +111,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ? const Center(child: Text('No games played yet.'))
           : ListView.builder(
               itemCount: games.length,
-              itemBuilder: (context, index) {
-                final game = games[index];
-                final players = (game['players'] as List).join(', ');
-                final date = DateTime.tryParse(game['createdAt'] ?? '') ?? DateTime.now();
-                final isCompleted = game['completedAt'] != null;
+              itemBuilder: (_, idx) {
+                final game = games[idx];
+                final date = game.createdAt.toLocal().toString().split('.')[0];
+                final status = game.completedAt != null ? 'Completed' : 'In Progress';
                 return ListTile(
-                  title: Text('Game Mode: ${_getGameMode(game)}'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Date: ${date.toLocal().toString().split('.')[0]}\n'
-                        'Players: ${shortenName(players, maxLength: 32)}\n',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (isCompleted && game['winner'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            'Winner: ${game['winner']}',
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  title: Text('Game Mode: ${game.gameMode}'),
+                  subtitle: Text('Date: $date\nPlayers: ${game.players.join(', ')}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        isCompleted ? 'Completed' : 'In Progress',
+                        status,
                         style: TextStyle(
-                          color: isCompleted ? Colors.green : Colors.orange,
+                          color: game.completedAt != null ? Colors.green : Colors.orange,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -200,10 +155,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           if (confirm == true) {
                             final prefs = await SharedPreferences.getInstance();
                             final List<String> gamesRaw = prefs.getStringList('games_history') ?? [];
-                            gamesRaw.removeAt(index);
+                            gamesRaw.removeAt(idx);
                             await prefs.setStringList('games_history', gamesRaw);
                             setState(() {
-                              games.removeAt(index);
+                              games.removeAt(idx);
                             });
                           }
                         },

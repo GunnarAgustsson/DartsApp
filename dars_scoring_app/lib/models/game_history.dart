@@ -37,12 +37,14 @@ class DartThrow {
 class GameHistory {
   final String id;
   final List<String> players;
-  final DateTime createdAt;
-  DateTime modifiedAt;
-  DateTime? completedAt;
+  DateTime createdAt, modifiedAt;
   final List<DartThrow> throws;
+  String? winner;
+  DateTime? completedAt;
   final int gameMode;
-  final String? winner;
+
+  int currentPlayer;
+  int dartsThrown;
 
   GameHistory({
     required this.id,
@@ -50,9 +52,11 @@ class GameHistory {
     required this.createdAt,
     required this.modifiedAt,
     required this.throws,
-    required this.gameMode,
-    this.completedAt,
     this.winner,
+    this.completedAt,
+    required this.gameMode,
+    this.currentPlayer = 0,
+    this.dartsThrown = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -60,20 +64,24 @@ class GameHistory {
         'players': players,
         'createdAt': createdAt.toIso8601String(),
         'modifiedAt': modifiedAt.toIso8601String(),
-        'completedAt': completedAt?.toIso8601String(),
-        'throws': throws.map((e) => e.toJson()).toList(),
-        'gameMode': gameMode,
+        'throws': throws.map((t) => t.toJson()).toList(),
         'winner': winner,
+        'completedAt': completedAt?.toIso8601String(),
+        'gameMode': gameMode,
+        'currentPlayer': currentPlayer,
+        'dartsThrown': dartsThrown,
       };
 
-  static GameHistory fromJson(Map<String, dynamic> json) => GameHistory(
-        id: json['id'],
-        players: List<String>.from(json['players']),
-        createdAt: DateTime.parse(json['createdAt']),
-        modifiedAt: DateTime.parse(json['modifiedAt']),
-        completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
-        throws: (json['throws'] as List).map((e) => DartThrow.fromJson(e)).toList(),
-        gameMode: json['gameMode'] ?? 501,
-        winner: json['winner'],
+  factory GameHistory.fromJson(Map<String, dynamic> j) => GameHistory(
+        id: j['id'],
+        players: List<String>.from(j['players']),
+        createdAt: DateTime.parse(j['createdAt']),
+        modifiedAt: DateTime.parse(j['modifiedAt']),
+        throws: (j['throws'] as List).map((e) => DartThrow.fromJson(e)).toList(),
+        winner: j['winner'],
+        completedAt: j['completedAt'] == null ? null : DateTime.parse(j['completedAt']),
+        gameMode: j['gameMode'],
+        currentPlayer: j['currentPlayer'] ?? 0,
+        dartsThrown: j['dartsThrown'] ?? 0,
       );
 }
