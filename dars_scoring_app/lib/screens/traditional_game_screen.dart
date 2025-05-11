@@ -44,8 +44,7 @@ class _GameScreenState extends State<GameScreen>
   // Toggle for showing the “next player” dropdown
   bool _showNextList = false;
 
-  bool _hasShownWinDialog = false; // ensure we only show once
-  bool _hasShownEndGameDialog = false; // ensure we only show once
+  bool _hasShownFinishDialog = false; // ensure we only show once
 
   @override
   void initState() {
@@ -90,105 +89,41 @@ class _GameScreenState extends State<GameScreen>
     if (_ctrl.showBust) _bustController.forward(from: 0);
     if (_ctrl.showTurnChange) _turnController.forward(from: 0);
 
-    // 1) Winner dialog (first‐to‐zero) – only once
-    if (_ctrl.lastWinner != null && !_hasShownWinDialog) {
-      _hasShownWinDialog = true;
+    // only one unified popup per finish
+    if (_ctrl.showPlayerFinished && !_hasShownFinishDialog) {
+      _hasShownFinishDialog = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showWinDialog(_ctrl.lastWinner!);
-      });
-    }
-
-    // 2) “Player finished” dialog – only for subsequent finishers
-    if (_ctrl.showPlayerFinished && _ctrl.lastFinisher != _ctrl.lastWinner) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showPlayerFinishedDialog(_ctrl.lastFinisher!);
-      });
-    }
-
-    // 3) End‐of‐game: no active players left
-    if (_ctrl.activePlayers.isEmpty && !_hasShownEndGameDialog) {
-      _hasShownEndGameDialog = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showEndGameDialog();
+        _showFinishDialog(_ctrl.lastFinisher!);
       });
     }
   }
 
-  Future<void> _showWinDialog(String winner) {
-    return showDialog(
-      context: context,
-      barrierDismissible: false, // force choice
-      builder: (_) => AlertDialog(
-        title: Text('Congratulations, $winner!'),
-        content: const Text('What would you like to do next?'),
-        actions: [
-          TextButton(
-            child: const Text('Continue with remaining players?'),
-            onPressed: () {
-              Navigator.of(context).pop(); // dismiss dialog
-              _ctrl.clearPlayerFinishedFlag();
-            },
-          ),
-          TextButton(
-            child: const Text('Play Again'),
-            onPressed: () {
-              Navigator.of(context).pop(); // dismiss
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => GameScreen(
-                    startingScore: widget.startingScore,
-                    players: widget.players,
-                  ),
-                ),
-              );
-            },
-          ),
-          TextButton(
-            child: const Text('Main Menu'),
-            onPressed: () {
-              Navigator.of(context).pop(); // dismiss
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _showFinishDialog(String finisher) {
+    final remaining = _ctrl.activePlayers.length;
+    final title = remaining > 0
+        ? 'Congratulations, $finisher!'
+        : 'Game Over';
+    final content = remaining > 0
+        ? Text('$finisher has finished!\nRemaining: ${_ctrl.activePlayers.join(", ")}')
+        : const Text('All players have finished.');
 
-  Future<void> _showPlayerFinishedDialog(String player) {
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text('$player has finished!'),
-        content: const Text('Continue with remaining players?'),
+        title: Text(title),
+        content: content,
         actions: [
-          TextButton(
-            child: const Text('Yes'),
-            onPressed: () {
-              Navigator.of(context).pop();
-              _ctrl.clearPlayerFinishedFlag();
-            },
-          ),
-          TextButton(
-            child: const Text('Main Menu'),
-            onPressed: () {
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showEndGameDialog() {
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text('Game Over'),
-        content: const Text('All players have finished.'),
-        actions: [
+          if (remaining > 0)
+            TextButton(
+              child: const Text('Continue'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _ctrl.clearPlayerFinishedFlag();
+                // allow next finish to show again
+                _hasShownFinishDialog = false;
+              },
+            ),
           TextButton(
             child: const Text('Play Again'),
             onPressed: () {
