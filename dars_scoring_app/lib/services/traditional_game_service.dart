@@ -2,7 +2,6 @@
 // SECTION: Imports
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart' show ChangeNotifier;
@@ -31,15 +30,43 @@ class TraditionalGameController extends ChangeNotifier {
   CheckoutRule checkoutRule;          // finish rule (double out, etc.)
   String? lastWinner;                 // non‐null once game completes
 
+  // New: track players who have completed
+  final List<String> _finishedPlayers = [];
+
+  // New: flag + last finisher for UI
+  bool showPlayerFinished = false;
+  String? lastFinisher;
+
   // Internal dependencies
   final AudioPlayer _audio = AudioPlayer();
+
+  /// Public getter: all players who have *not* finished yet
+  List<String> get activePlayers =>
+    players.where((p) => !_finishedPlayers.contains(p)).toList();
+
+  /// Public getter: index in [activePlayers] of the current turn
+  int get activeCurrentIndex =>
+    activePlayers.indexOf(players[currentPlayer]);
+
+  /// Public getter: index in [activePlayers] of next turn
+  int get activeNextIndex {
+    final act = activePlayers;
+    if (act.isEmpty) return 0;
+    // map raw currentPlayer → act list, then +1 mod act.length
+    final curName = players[currentPlayer];
+    final idx = act.indexOf(curName);
+    return (idx + 1) % act.length;
+  }
+
+  /// Return the score for a given player name
+  int scoreFor(String player) => scores[players.indexOf(player)];
 
   /// Constructor: initializes state, resumes history if provided.
   TraditionalGameController({
     required this.startingScore,
     required this.players,
     GameHistory? resumeGame,
-  })  : currentGame = resumeGame ??
+  })  : currentGame = resumeGame ?? 
             GameHistory(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
               players: players,
@@ -103,22 +130,27 @@ class TraditionalGameController extends ChangeNotifier {
     bool isBust = false, isWin = false;
     switch (checkoutRule) {
       case CheckoutRule.doubleOut:
-        if (after < 0 || after == 1) isBust = true;
-        else if (after == 0 &&
+        if (after < 0 || after == 1) {
+          isBust = true;
+        } else if (after == 0 &&
             (multiplier != 2 && value != 50)) isBust = true;
         else if (after == 0) isWin = true;
         break;
       case CheckoutRule.extendedOut:
-        if (after < 0 || after == 1) isBust = true;
-        else if (after == 0 &&
+        if (after < 0 || after == 1) {
+          isBust = true;
+        } else if (after == 0 &&
             (multiplier != 2 &&
                 multiplier != 3 &&
                 value != 50)) isBust = true;
         else if (after == 0) isWin = true;
         break;
       case CheckoutRule.exactOut:
-        if (after < 0 || after == 1) isBust = true;
-        else if (after == 0) isWin = true;
+        if (after < 0) {
+          isBust = true;
+        } else if (after == 0) {
+          isWin = true;
+        }
         break;
       case CheckoutRule.openFinish:
         if (after <= 0) isWin = true;
@@ -151,9 +183,38 @@ class TraditionalGameController extends ChangeNotifier {
       dartsThrown++;
 
       if (isWin) {
-        // Game completes
-        lastWinner = players[currentPlayer];
-        await _finishGame();
+        final finisher = players[currentPlayer];
+
+        // 1) record finisher for UI
+        lastFinisher       = finisher;
+        showPlayerFinished = true;
+
+        // 2) first‐to‐zero → set winner/completedAt once
+        if (currentGame.winner == null) {
+          currentGame.winner      = finisher;
+          currentGame.completedAt = DateTime.now();
+          lastWinner              = finisher;
+          await _saveHistory();
+        }
+
+        // 3) mark them finished (but keep them in the list)
+        _finishedPlayers.add(finisher);
+
+        // 4) immediately advance to the next active player
+        //    so that activeCurrentIndex is always valid:
+        int next = currentPlayer;
+        do {
+          next = (next + 1) % players.length;
+        } while (_finishedPlayers.contains(players[next])
+                 && _finishedPlayers.length < players.length);
+        currentPlayer = next;
+
+        // 5) reset this turn’s darts
+        dartsThrown = 0;
+
+        // 6) notify UI & bail out
+        notifyListeners();
+        return;
       } else if (dartsThrown >= 3) {
         // End of turn
         dartsThrown = 0;
@@ -168,42 +229,83 @@ class TraditionalGameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Undo the most recent throw
+  /// Call this from your UI after showing the “X finished” popup
+  void clearPlayerFinishedFlag() {
+    showPlayerFinished = false;
+    lastFinisher       = null;
+    notifyListeners();
+  }
+
+  /// Undo the most recent throw, but if the player hasn't thrown any darts
+  /// this turn (dartsThrown == 0), first revert the turn to the previous player.
   Future<void> undoLastThrow() async {
     if (currentGame.throws.isEmpty) return;
 
-    // Remove last throw and restore score & dart‐count
-    final last = currentGame.throws.removeLast();
-    final idx = players.indexOf(last.player);
-    scores[idx] = last.resultingScore +
-        (last.value * last.multiplier);
-    dartsThrown = max(0, dartsThrown - 1);
+    // 1) If start of turn (no darts thrown yet), step back to the player who threw last
+    if (dartsThrown == 0) {
+      final lastThrow = currentGame.throws.last;
+      currentPlayer = players.indexOf(lastThrow.player);
 
-    currentGame.modifiedAt = DateTime.now();
+      // Recompute how many darts they used in that turn
+      final consec = currentGame.throws
+          .reversed
+          .takeWhile((t) => t.player == lastThrow.player)
+          .length;
+      dartsThrown = consec.clamp(0, 3);
+    }
+
+    // 2) Now remove that last throw record
+    final last = currentGame.throws.removeLast();
+
+    // 3) Restore that player's score to what it was before the throw
+    final idx = players.indexOf(last.player);
+    final prevThrows = currentGame.throws
+        .where((t) => t.player == last.player)
+        .toList();
+    final prevScore = prevThrows.isNotEmpty
+        ? prevThrows.last.resultingScore
+        : startingScore;
+    scores[idx] = prevScore;
+
+    // 4) If that throw was a winning throw (score == 0), clear the win state
+    if (last.resultingScore == 0) {
+      lastWinner = null;
+      currentGame.completedAt = null;
+    }
+
+    // 5) Decrement dartsThrown (we just “undid” one dart)
+    dartsThrown = (dartsThrown - 1).clamp(0, 3);
+
+    // 6) Persist updated history & notify UI
+    currentGame
+      ..currentPlayer = currentPlayer
+      ..dartsThrown   = dartsThrown
+      ..modifiedAt    = DateTime.now();
     await _saveHistory();
     notifyListeners();
   }
 
   // ───── Internal helpers ───────────────────────────────────────────────────
 
-  /// Advance to next player with a turn-change flash
+  /// Advance to next *active* player with a turn‐change flash
   void _advanceTurn() {
     showTurnChange = true;
     // Clear flash and update player after 1s
     Future.delayed(const Duration(seconds: 1), () {
       showTurnChange = false;
-      currentPlayer = (currentPlayer + 1) % players.length;
-      dartsThrown = 0;
+
+      // find next player who is not finished
+      int next = currentPlayer;
+      do {
+        next = (next + 1) % players.length;
+      } while (_finishedPlayers.contains(players[next])
+               && _finishedPlayers.length < players.length);
+
+      currentPlayer = next;
+      dartsThrown   = 0;
       notifyListeners();
     });
     notifyListeners();
-  }
-
-  /// Mark game as finished and persist
-  Future<void> _finishGame() async {
-    currentGame.winner = lastWinner;
-    currentGame.completedAt = DateTime.now();
-    await _saveHistory();
   }
 
   /// Persist the game history list in SharedPreferences
@@ -221,8 +323,11 @@ class TraditionalGameController extends ChangeNotifier {
     final idx = games.indexWhere((g) {
       return jsonDecode(g)['id'] == currentGame.id;
     });
-    if (idx < 0) games.add(json);
-    else games[idx] = json;
+    if (idx < 0) {
+      games.add(json);
+    } else {
+      games[idx] = json;
+    }
 
     await prefs.setStringList('games_history', games);
   }

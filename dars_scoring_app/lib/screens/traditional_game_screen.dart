@@ -44,11 +44,12 @@ class _GameScreenState extends State<GameScreen>
   // Toggle for showing the “next player” dropdown
   bool _showNextList = false;
 
+  bool _hasShownWinDialog = false; // ensure we only show once
+  bool _hasShownEndGameDialog = false; // ensure we only show once
+
   @override
   void initState() {
     super.initState();
-
-    // Instantiate our game-logic controller and listen for changes
     _ctrl = TraditionalGameController(
       startingScore: widget.startingScore,
       players: widget.players,
@@ -84,29 +85,154 @@ class _GameScreenState extends State<GameScreen>
   /// Called whenever our game logic (TraditionalGameController) notifies.
   /// Starts the appropriate animation and triggers a rebuild.
   void _onStateChanged() {
-    if (_ctrl.showBust) {
-      _bustController.forward(from: 0);
-    }
-    if (_ctrl.showTurnChange) {
-      _turnController.forward(from: 0);
-    }
     setState(() {});
+
+    if (_ctrl.showBust) _bustController.forward(from: 0);
+    if (_ctrl.showTurnChange) _turnController.forward(from: 0);
+
+    // 1) Winner dialog (first‐to‐zero) – only once
+    if (_ctrl.lastWinner != null && !_hasShownWinDialog) {
+      _hasShownWinDialog = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showWinDialog(_ctrl.lastWinner!);
+      });
+    }
+
+    // 2) “Player finished” dialog – only for subsequent finishers
+    if (_ctrl.showPlayerFinished && _ctrl.lastFinisher != _ctrl.lastWinner) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showPlayerFinishedDialog(_ctrl.lastFinisher!);
+      });
+    }
+
+    // 3) End‐of‐game: no active players left
+    if (_ctrl.activePlayers.isEmpty && !_hasShownEndGameDialog) {
+      _hasShownEndGameDialog = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showEndGameDialog();
+      });
+    }
+  }
+
+  Future<void> _showWinDialog(String winner) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false, // force choice
+      builder: (_) => AlertDialog(
+        title: Text('Congratulations, $winner!'),
+        content: const Text('What would you like to do next?'),
+        actions: [
+          TextButton(
+            child: const Text('Continue with remaining players?'),
+            onPressed: () {
+              Navigator.of(context).pop(); // dismiss dialog
+              _ctrl.clearPlayerFinishedFlag();
+            },
+          ),
+          TextButton(
+            child: const Text('Play Again'),
+            onPressed: () {
+              Navigator.of(context).pop(); // dismiss
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => GameScreen(
+                    startingScore: widget.startingScore,
+                    players: widget.players,
+                  ),
+                ),
+              );
+            },
+          ),
+          TextButton(
+            child: const Text('Main Menu'),
+            onPressed: () {
+              Navigator.of(context).pop(); // dismiss
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPlayerFinishedDialog(String player) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: Text('$player has finished!'),
+        content: const Text('Continue with remaining players?'),
+        actions: [
+          TextButton(
+            child: const Text('Yes'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _ctrl.clearPlayerFinishedFlag();
+            },
+          ),
+          TextButton(
+            child: const Text('Main Menu'),
+            onPressed: () {
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEndGameDialog() {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Game Over'),
+        content: const Text('All players have finished.'),
+        actions: [
+          TextButton(
+            child: const Text('Play Again'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => GameScreen(
+                    startingScore: widget.startingScore,
+                    players: widget.players,
+                  ),
+                ),
+              );
+            },
+          ),
+          TextButton(
+            child: const Text('Main Menu'),
+            onPressed: () {
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // ---- 3) Read current state from the controller ----
-    final players = _ctrl.players;
-    final scores = _ctrl.scores;
-    final currentPlayer = _ctrl.currentPlayer;
-    final dartsThrown = _ctrl.dartsThrown;
-    final multiplier = _ctrl.multiplier;
+    final act = _ctrl.activePlayers;
+    // GUARD: if empty, don’t index into act[curIdx]
+    if (act.isEmpty) {
+      return const Scaffold(
+        body: SizedBox.expand(),
+      );
+    }
+
+    final curIdx = _ctrl.activeCurrentIndex;
+    final nxtIdx = _ctrl.activeNextIndex;
+    final actScores = act.map((p) => _ctrl.scoreFor(p)).toList();
+
     final showBust = _ctrl.showBust;
     final showTurnChange = _ctrl.showTurnChange;
     final isTurnChanging = _ctrl.isTurnChanging;
 
     // Compute next player index for UI hints
-    final nextIndex = (currentPlayer + 1) % players.length;
     final gameLabel = '${widget.startingScore}-pt Game';
 
     // ---- 4) Responsive layout constants ----
@@ -184,8 +310,8 @@ class _GameScreenState extends State<GameScreen>
               padding: EdgeInsets.only(right: 16 * scale),
               child: Center(
                 child: Text(
-                  'Next: ${shortenName(players[nextIndex], maxLength: 12)} '
-                  '(${scores[nextIndex]})',
+                  'Next: ${shortenName(act[nxtIdx], maxLength: 12)} '
+                  '(${actScores[nxtIdx]})',
                   style: TextStyle(
                     color: Theme.of(context).brightness == Brightness.dark
                         ? Colors.white
@@ -241,7 +367,7 @@ class _GameScreenState extends State<GameScreen>
                                 lastTurnLabels:
                                     _ctrl.lastTurnLabels(),
                                 nextPlayerName:
-                                    players[nextIndex],
+                                    act[nxtIdx],
                                 bustFontSize: overlayBustFontSize,
                                 turnNameFontSize:
                                     overlayTurnNameFontSize,
@@ -272,7 +398,7 @@ class _GameScreenState extends State<GameScreen>
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
-                                    multiplier == 2
+                                    _ctrl.multiplier == 2
                                         ? Colors.blue
                                         : null,
                                 textStyle: TextStyle(
@@ -291,7 +417,7 @@ class _GameScreenState extends State<GameScreen>
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
-                                    multiplier == 3
+                                    _ctrl.multiplier == 3
                                         ? Colors.blue
                                         : null,
                                 textStyle: TextStyle(
@@ -487,7 +613,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: players
+                  children: act
                       .asMap()
                       .entries
                       .map((entry) {
@@ -495,11 +621,11 @@ class _GameScreenState extends State<GameScreen>
                     final name = shortenName(
                         entry.value,
                         maxLength: 12);
-                    final pts = scores[idx];
+                    final pts = actScores[idx];
                     final isCurrent =
-                        idx == currentPlayer;
+                        idx == curIdx;
                     final isUpcoming =
-                        idx == nextIndex;
+                        idx == nxtIdx;
 
                     return ListTile(
                       dense: true,
@@ -542,9 +668,9 @@ class _GameScreenState extends State<GameScreen>
     required double dartIconSize,
     required double possibleFinishFontSize,
   }) {
-    final players = _ctrl.players;
-    final scores = _ctrl.scores;
-    final currentIndex = _ctrl.currentPlayer;
+    final act = _ctrl.activePlayers;
+    final actScores = act.map((p) => _ctrl.scoreFor(p)).toList();
+    final curIdx = _ctrl.activeCurrentIndex;
 
     return Center(
       child: Container(
@@ -573,7 +699,7 @@ class _GameScreenState extends State<GameScreen>
             // Player name (shortened if too long)
             Text(
               shortenName(
-                  players[currentIndex],
+                  act[curIdx],
                   maxLength: 12),
               style: TextStyle(
                 fontSize: playerNameFontSize,
@@ -587,7 +713,7 @@ class _GameScreenState extends State<GameScreen>
 
             // Current score
             Text(
-              '${scores[currentIndex]}',
+              '${actScores[curIdx]}',
               style: TextStyle(
                 fontSize: playerScoreFontSize,
                 fontWeight: FontWeight.bold,

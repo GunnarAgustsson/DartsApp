@@ -30,7 +30,7 @@ List<String>? calculateCheckout(
   segments.sort((a, b) => b.value.compareTo(a.value));
 
   // 2) Helper: check if a final segment [code,value] satisfies [rule]
-  bool _validLast(MapEntry<String,int> seg, int total) {
+  bool validLast(MapEntry<String,int> seg, int total) {
     switch (rule) {
       case CheckoutRule.openFinish:
         // any finish that reaches or exceeds target
@@ -53,7 +53,7 @@ List<String>? calculateCheckout(
   if (remainingDarts >= 1) {
     for (var s1 in segments) {
       final sum1 = s1.value;
-      if (_validLast(s1, sum1)) {
+      if (validLast(s1, sum1)) {
         return [s1.key];
       }
     }
@@ -64,7 +64,7 @@ List<String>? calculateCheckout(
     for (var s1 in segments) {
       for (var s2 in segments) {
         final sum2 = s1.value + s2.value;
-        if (_validLast(s2, sum2)) {
+        if (validLast(s2, sum2)) {
           return [s1.key, s2.key];
         }
       }
@@ -77,7 +77,7 @@ List<String>? calculateCheckout(
       for (var s2 in segments) {
         for (var s3 in segments) {
           final sum3 = s1.value + s2.value + s3.value;
-          if (_validLast(s3, sum3)) {
+          if (validLast(s3, sum3)) {
             return [s1.key, s2.key, s3.key];
           }
         }
