@@ -700,8 +700,11 @@ class _GameScreenState extends State<GameScreen>
       color: Theme.of(context)
           .primaryColor,
     );
-    final iconColor =
-        Theme.of(context).primaryColor;
+
+    // Change dart‐icon color based on theme so it’s visible in dark mode
+    final iconColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white70
+        : Theme.of(context).primaryColor;
 
     return Row(
       mainAxisAlignment:
@@ -739,7 +742,7 @@ class _GameScreenState extends State<GameScreen>
               width: iconSize,
               height: iconSize,
               colorFilter: ColorFilter.mode(
-                  iconColor, BlendMode.srcIn),
+                  iconColor, BlendMode.srcIn), // ← uses iconColor
             ),
           ),
         ],
