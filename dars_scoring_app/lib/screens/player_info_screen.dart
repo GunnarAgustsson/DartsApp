@@ -31,6 +31,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
   HitTypeFilter _selectedFilter = HitTypeFilter.all;
   DartCountFilter _selectedCountFilter = DartCountFilter.all;
   final ScrollController _heatmapScrollController = ScrollController();
+  List<double> _avgPerGameTrend = [];
+  int _countSingles = 0, _countDoubles = 0, _countTriples = 0, _countBulls = 0;
+  Map<String, int> _finishCount = {};
 
   @override
   void initState() {
@@ -52,6 +55,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
     int finishedLegs = 0;
     Map<int, int> hitCount = {};
     List<bool> lastResults = [];
+    final List<double> perGameAvgs = [];
+    final Map<String, int> finishMap = {};
+    int singles = 0, doubles = 0, triples = 0, bulls = 0;
 
     // For winrate, count only completed games
     for (final g in games.reversed) {
@@ -104,8 +110,45 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
       }
 
       playerGames.add(game);
+
+      // Compute this game’s average *before* maybe breaking
+      final scoresThisGame = throws
+          .where((t) => t['wasBust'] == false)
+          .map((t) => (t['value'] as int) * (t['multiplier'] as int))
+          .toList();
+      if (scoresThisGame.isNotEmpty) {
+        perGameAvgs.add(
+          scoresThisGame.reduce((a, b) => a + b) / scoresThisGame.length,
+        );
+      }
+
       gamesCounted++;
       if (gamesCounted == 8) break; // Only last 8 completed games
+
+      // Count segment‐type distribution
+      for (final t in throws) {
+        if (t['wasBust'] == true) continue;
+        final v = t['value'] as int;
+        final m = t['multiplier'] as int;
+        if (v == 25 && m == 1) bulls++;
+        else if (m == 3) triples++;
+        else if (m == 2) doubles++;
+        else singles++;
+      }
+
+      // Record finish segment
+      if (throws.isNotEmpty && throws.last['resultingScore'] == 0) {
+        final t = throws.last;
+        final v = t['value'] as int;
+        final m = t['multiplier'] as int;
+        String code;
+        if (v == 50) code = 'DB';
+        else if (v == 25) code = 'SB';
+        else if (m == 3) code = 'T$v';
+        else if (m == 2) code = 'D$v';
+        else code = 'S$v';
+        finishMap[code] = (finishMap[code] ?? 0) + 1;
+      }
     }
 
     // Most hit number
@@ -132,6 +175,12 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
       mostHitNumber = hitNum;
       mostHitCount = hitNumCount;
       recentResults = lastResults;
+      _avgPerGameTrend = perGameAvgs.reversed.toList();
+      _countSingles = singles;
+      _countDoubles = doubles;
+      _countTriples = triples;
+      _countBulls = bulls;
+      _finishCount = finishMap;
     });
   }
 
@@ -239,6 +288,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
 
     final filteredHeatmap = _filteredHeatmap(_selectedFilter);
     final maxHits = filteredHeatmap.values.isEmpty ? 1 : filteredHeatmap.values.reduce((a, b) => a > b ? a : b);
+
+    final spots = _avgPerGameTrend.asMap().entries.map((e) =>
+        FlSpot(e.key.toDouble(), e.value)).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text('${widget.playerName} Stats')),
@@ -439,6 +491,58 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
                 ),
                 SizedBox(height: 24 * scale),
               ],
+            ),
+            SizedBox(height: 24 * scale),
+            Text('Average per Game (last ${spots.length}):', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
+            SizedBox(
+              height: 180 * scale,
+              child: LineChart(LineChartData(
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) => 
+                        Text('${v.toInt() + 1}', style: TextStyle(fontSize: 10 * scale)),
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28 * scale,
+                      getTitlesWidget: (value, meta) {
+                        if (value % 1 == 0) {
+                          return Text(
+                            value.toInt().toString(),
+                            style: TextStyle(fontSize: 10 * scale),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    dotData: FlDotData(show: true),
+                  ),
+                ],
+              )),
+            ),
+            SizedBox(height: 24 * scale),
+            Text('Segment Distribution:', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
+            SizedBox(
+              height: 180 * scale,
+              child: PieChart(PieChartData(
+                sections: [
+                  PieChartSectionData(value: _countSingles.toDouble(), color: Colors.blue, title: 'S'),
+                  PieChartSectionData(value: _countDoubles.toDouble(), color: Colors.green, title: 'D'),
+                  PieChartSectionData(value: _countTriples.toDouble(), color: Colors.red, title: 'T'),
+                  PieChartSectionData(value: _countBulls.toDouble(), color: Colors.orange, title: 'B'),
+                ],
+                centerSpaceRadius: 40 * scale,
+              )),
             ),
             SizedBox(height: 24 * scale),
             Text('Last 8 Games:', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.bold)),
