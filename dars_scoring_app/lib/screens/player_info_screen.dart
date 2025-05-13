@@ -130,8 +130,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
         if (t['wasBust'] == true) continue;
         final v = t['value'] as int;
         final m = t['multiplier'] as int;
-        if (v == 25 && m == 1) bulls++;
-        else if (m == 3) triples++;
+        if (v == 25 && m == 1) {
+          bulls++;
+        } else if (m == 3) triples++;
         else if (m == 2) doubles++;
         else singles++;
       }
@@ -142,8 +143,9 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> {
         final v = t['value'] as int;
         final m = t['multiplier'] as int;
         String code;
-        if (v == 50) code = 'DB';
-        else if (v == 25) code = 'SB';
+        if (v == 50) {
+          code = 'DB';
+        } else if (v == 25) code = 'SB';
         else if (m == 3) code = 'T$v';
         else if (m == 2) code = 'D$v';
         else code = 'S$v';
