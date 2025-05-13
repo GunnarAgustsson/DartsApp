@@ -12,7 +12,7 @@ class GameModeScreen extends StatelessWidget {
 
   Future<List<String>?> _showPlayerSelectionDialog(BuildContext context) async {
     final players = await _getPlayers();
-    final selected = <String>{};
+    final selected = <String>[]; // use List to keep insertion order
 
     return showDialog<List<String>>(
       context: context,
@@ -28,18 +28,35 @@ class GameModeScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final player = players[index];
                   final isSelected = selected.contains(player);
-                  return CheckboxListTile(
+                  final order = isSelected ? selected.indexOf(player) + 1 : null;
+
+                  return ListTile(
+                    leading: isSelected
+                        ? CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Theme.of(context).colorScheme.secondary,
+                            child: Text(
+                              '$order',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
+                        : const SizedBox(width: 24), // reserve space so things don’t shift
                     title: Text(player),
-                    value: isSelected,
-                    onChanged: (checked) {
-                      setState(() {
-                        if (checked == true && selected.length < 8) {
-                          selected.add(player);
-                        } else {
-                          selected.remove(player);
-                        }
-                      });
-                    },
+                    trailing: Checkbox(
+                      value: isSelected,
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true && selected.length < 8) {
+                            selected.add(player);
+                          } else {
+                            selected.remove(player);
+                          }
+                        });
+                      },
+                    ),
                   );
                 },
               ),
