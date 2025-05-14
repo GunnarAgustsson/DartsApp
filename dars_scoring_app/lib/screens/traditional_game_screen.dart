@@ -542,9 +542,15 @@ class _GameScreenState extends State<GameScreen>
               right: 16 * scale,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius:
-                      BorderRadius.circular(8 * scale),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[800]
+                      : Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(8 * scale),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade300
+                        : Colors.black,
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -615,7 +621,9 @@ class _GameScreenState extends State<GameScreen>
           horizontal: 24 * (playerNameFontSize / 42),
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(
               16 * (playerNameFontSize / 42)),
           boxShadow: [
@@ -697,8 +705,7 @@ class _GameScreenState extends State<GameScreen>
     final activeTextStyle = TextStyle(
       fontSize: iconSize * 0.8,
       fontWeight: FontWeight.bold,
-      color: Theme.of(context)
-          .primaryColor,
+      color: Theme.of(context).colorScheme.onSurface,
     );
 
     // Change dart‐icon color based on theme so it’s visible in dark mode
@@ -755,19 +762,19 @@ class _GameScreenState extends State<GameScreen>
       {double fontSize = 18}) {
     final score = _ctrl.scores[_ctrl.currentPlayer];
     final dartsLeft = 3 - _ctrl.dartsThrown;
-    final finish = calculateCheckout(
+    final options = bestCheckouts(
       score,
       dartsLeft,
       _ctrl.checkoutRule,
+      limit: 3,    // top 3
     );
 
-    if (finish != null) {
-      // Show the best finish string
+    if (options.isNotEmpty) {
+      // pick the very best one, or show all 3
+      final best = options.first;
       return Text(
-        'Possible finish: ${finish.join(" ")}',
-        style: TextStyle(
-            fontSize: fontSize,
-            color: Colors.grey[600]),
+        'Best finish: ${best.join(" ")}',
+        style: TextStyle(fontSize: fontSize, color: Colors.grey[600]),
       );
     }
 

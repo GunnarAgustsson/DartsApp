@@ -89,6 +89,9 @@ class TraditionalGameController extends ChangeNotifier {
           CheckoutRule.values[prefs.getInt('checkoutRule') ?? 0];
       notifyListeners();
     });
+
+    // when each sound finishes, release the player so it can be re-used immediately
+    _audio.setReleaseMode(ReleaseMode.stop);
   }
 
   /// Private: replay history to restore scores, current player, etc.
@@ -113,9 +116,16 @@ class TraditionalGameController extends ChangeNotifier {
   /// Main scoring method: apply a throw value (0,1–20,25,50)
   Future<void> score(int value) async {
     // Haptic feedback & dart‐throw sound
-    HapticFeedback.lightImpact();
-    await _audio.play(AssetSource('sound/dart_throw.mp3'),
-        volume: 0.5);
+    HapticFeedback.mediumImpact();
+
+    // stop any in-flight sound, so play() will always start from zero
+    await _audio.stop();
+
+    // no need to await the entire playback; this returns once playback has begun
+    _audio.play(
+      AssetSource('sound/dart_throw.mp3'),
+      volume: 0.5,
+    );
 
     // On first dart of turn, remember starting score
     if (dartsThrown == 0) turnStartScore = scores[currentPlayer];

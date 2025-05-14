@@ -7,93 +7,11 @@ enum CheckoutRule {
   openFinish,   // any segment, sum >= remainingScore wins
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-/// Attempts to find a sequence of up to [remainingDarts] throws that
-/// lets you finish [remainingScore] under [rule].
-/// Returns a list of segment codes (e.g. ["T20","T20","D5"]) if found,
-/// or null if no legal checkout exists.
-List<String>? calculateCheckout(
-  int remainingScore,
-  int remainingDarts,
-  CheckoutRule rule,
-) {
-  // 1) Build all possible segments: triples, doubles, singles, bull(50), outer bull(25)
-  final segments = <MapEntry<String, int>>[];
-  for (var i = 1; i <= 20; i++) {
-    segments.add(MapEntry('T$i', 3 * i));
-    segments.add(MapEntry('D$i', 2 * i));
-    segments.add(MapEntry('S$i', i));
-  }
-  segments.add(MapEntry('D25', 50));
-  segments.add(MapEntry('S25', 25));
-  // Sort descending so we try high‐value finishes first
-  segments.sort((a, b) => b.value.compareTo(a.value));
-
-  // 2) Helper: check if a final segment [code,value] satisfies [rule]
-  bool validLast(MapEntry<String,int> seg, int total) {
-    switch (rule) {
-      case CheckoutRule.openFinish:
-        // any finish that reaches or exceeds target
-        return total >= remainingScore;
-      case CheckoutRule.exactOut:
-        // exact match to zero
-        return total == remainingScore;
-      case CheckoutRule.doubleOut:
-        // exact zero on a double or bull
-        return total == remainingScore
-            && (seg.key.startsWith('D'));
-      case CheckoutRule.extendedOut:
-        // exact zero on double, triple, or bull
-        return total == remainingScore
-            && (seg.key.startsWith('D') || seg.key.startsWith('T'));
-    }
-  }
-
-  // 3) Try 1‐dart combos
-  if (remainingDarts >= 1) {
-    for (var s1 in segments) {
-      final sum1 = s1.value;
-      if (validLast(s1, sum1)) {
-        return [s1.key];
-      }
-    }
-  }
-
-  // 4) Try 2‐dart combos
-  if (remainingDarts >= 2) {
-    for (var s1 in segments) {
-      for (var s2 in segments) {
-        final sum2 = s1.value + s2.value;
-        if (validLast(s2, sum2)) {
-          return [s1.key, s2.key];
-        }
-      }
-    }
-  }
-
-  // 5) Try 3‐dart combos
-  if (remainingDarts >= 3) {
-    for (var s1 in segments) {
-      for (var s2 in segments) {
-        for (var s3 in segments) {
-          final sum3 = s1.value + s2.value + s3.value;
-          if (validLast(s3, sum3)) {
-            return [s1.key, s2.key, s3.key];
-          }
-        }
-      }
-    }
-  }
-
-  // No legal checkout found
-  return null;
-}
-
 // ─── Ranking helpers ────────────────────────────────────────────────────────
 
 // A priority list of ideal double finishes (lower index = more preferred)
 const List<int> _preferredDoubles = [
-  32, 16, 8, 40, 24, 36, 20, 12, 28, 10, 4, 2, 6, 18, 14, 38, 26, 22, 34, 30
+  40, 32, 24, 16, 8, 4, 12, 20, 28, 36, 6, 18, 10, 14, 38, 26, 22, 34, 30, 2
 ];
 
 // Parse a segment code into its score
@@ -122,16 +40,27 @@ List<List<String>> getAllCheckouts(
     segments.add(MapEntry('D$i', i * 2));
     segments.add(MapEntry('S$i', i));
   }
-  segments.add(MapEntry('D25', 50));
-  segments.add(MapEntry('S25', 25));
+  // allow a 50 finish under double-out
+  segments.add(MapEntry('DB', 50));
+  segments.add(MapEntry('25', 25));
   segments.sort((a, b) => b.value.compareTo(a.value));
 
   bool validLast(MapEntry<String,int> seg, int total) {
     switch (rule) {
-      case CheckoutRule.openFinish:  return total >= remainingScore;
-      case CheckoutRule.exactOut:    return total == remainingScore;
-      case CheckoutRule.doubleOut:   return total == remainingScore && seg.key.startsWith('D');
-      case CheckoutRule.extendedOut: return total == remainingScore && (seg.key.startsWith('D') || seg.key.startsWith('T'));
+      case CheckoutRule.openFinish:
+        return total >= remainingScore;
+      case CheckoutRule.exactOut:
+        return total == remainingScore;
+      case CheckoutRule.doubleOut:
+        // must finish on a double; treat DB (bull) as a valid double always
+        if (total == remainingScore
+            && (seg.key.startsWith('D') || seg.key == 'DB')) {
+          return true;
+        }
+        return false;
+      case CheckoutRule.extendedOut:
+        return total == remainingScore
+            && (seg.key.startsWith('D') || seg.key.startsWith('T'));
     }
   }
 
@@ -162,30 +91,113 @@ List<List<String>> getAllCheckouts(
   return results;
 }
 
-// Sort by (1) preferred double finish, (2) fewer darts, (3) fewer trebles
+// Sort by (1) fewer darts, (2) preferred double finish, (3) more trebles
 List<List<String>> rankCheckouts(List<List<String>> combos) {
   combos.sort((a, b) {
-    final pa = _preferredDoubles.indexOf(_scoreOf(a.last)).clamp(0, _preferredDoubles.length);
-    final pb = _preferredDoubles.indexOf(_scoreOf(b.last)).clamp(0, _preferredDoubles.length);
-    final cmpD = pa.compareTo(pb);
-    if (cmpD != 0) return cmpD;
-    if (a.length != b.length) return a.length.compareTo(b.length);
+    // 1) Fewer darts first
+    if (a.length != b.length) {
+      return a.length.compareTo(b.length);
+    }
+
+    // 2) Preferred last‐dart double order
+    final va = _scoreOf(a.last), vb = _scoreOf(b.last);
+    final ia = _preferredDoubles.indexOf(va);
+    final ib = _preferredDoubles.indexOf(vb);
+    final pa = ia >= 0 ? ia : _preferredDoubles.length;
+    final pb = ib >= 0 ? ib : _preferredDoubles.length;
+    final d = pa.compareTo(pb);
+    if (d != 0) {
+      return d;
+    }
+
+    // 3) More trebles is better
     final ta = a.where((seg) => seg.startsWith('T')).length;
     final tb = b.where((seg) => seg.startsWith('T')).length;
-    return ta.compareTo(tb);
+    return tb.compareTo(ta);
   });
   return combos;
 }
 
-/// Returns the top [limit] checkout sequences (default 3), or `[]` if none.
+/// Returns the top [limit] checkout sequences (default 1), or `[]` if none.
+/// Always picks the shortest possible finishes only.
 List<List<String>> bestCheckouts(
   int remainingScore,
   int remainingDarts,
   CheckoutRule rule, {
-  int limit = 3,
+  int limit = 1,
 }) {
-  final all = getAllCheckouts(remainingScore, remainingDarts, rule);
-  if (all.isEmpty) return [];
-  final ranked = rankCheckouts(all);
-  return ranked.take(limit).toList();
+  for (var darts = 1; darts <= remainingDarts; darts++) {
+    final combos = getAllCheckouts(remainingScore, darts, rule);
+    if (combos.isEmpty) continue;
+
+    combos.sort((a, b) {
+      // 1) fewer darts
+      if (a.length != b.length) {
+        return a.length.compareTo(b.length);
+      }
+
+      // 2) rule‐specific priority
+      if (rule == CheckoutRule.exactOut) {
+        // segment‐type priority: T < Bull < D < Single
+        int typePriority(String code) {
+          if (code.startsWith('T')) return 0;
+          if (code == 'DB' || code == '25') return 1;
+          if (code.startsWith('D')) return 2;
+          return 3; // all other 'S' (singles)
+        }
+
+        // last‐dart type
+        final la = typePriority(a.last);
+        final lb = typePriority(b.last);
+        if (la != lb) return lb.compareTo(la);
+
+        // first‐dart type
+        final fa = typePriority(a[0]);
+        final fb = typePriority(b[0]);
+        if (fa != fb) return fb.compareTo(fa);
+
+        // tie‐break by first‐dart value
+        final va = _scoreOf(a[0]);
+        final vb = _scoreOf(b[0]);
+        return vb.compareTo(va);
+      }
+
+      if (rule == CheckoutRule.extendedOut) {
+        // must finish on D or T (including DB) but prefer pure doubles > DB > trebles
+        int finishPriority(String code) {
+          if (code.startsWith('D') && code != 'DB') return 0; // normal doubles
+          if (code == 'DB') return 1;                       // double bull
+          if (code.startsWith('T')) return 2;                // trebles
+          return 3;                                          // should not happen
+        }
+
+        final pa = finishPriority(a.last), pb = finishPriority(b.last);
+        if (pa != pb) return pa.compareTo(pb);
+
+        // same finish‐type, prefer higher‐value finish dart
+        final la = _scoreOf(a.last), lb = _scoreOf(b.last);
+        if (la != lb) return lb.compareTo(la);
+
+        // tie-break: higher first-dart score
+        final fa = _scoreOf(a[0]), fb = _scoreOf(b[0]);
+        return fb.compareTo(fa);
+      }
+
+      // doubleOut & openFinish: existing logic …
+      final va = _scoreOf(a.last), vb = _scoreOf(b.last);
+      final ia = _preferredDoubles.indexOf(va);
+      final ib = _preferredDoubles.indexOf(vb);
+      final pa = ia >= 0 ? ia : _preferredDoubles.length;
+      final pb = ib >= 0 ? ib : _preferredDoubles.length;
+      final cmpD = pa.compareTo(pb);
+      if (cmpD != 0) return cmpD;
+
+      final ta = a.where((s) => s.startsWith('T')).length;
+      final tb = b.where((s) => s.startsWith('T')).length;
+      return tb.compareTo(ta);
+    });
+
+    return combos.take(limit).toList();
+  }
+  return <List<String>>[];
 }
