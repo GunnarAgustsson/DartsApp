@@ -142,12 +142,30 @@ class TraditionalGameController extends ChangeNotifier {
     final hit = _calculateEffectiveHit(value);
     final before = scores[currentPlayer];
     final after = before - hit;
-
-    // Handle bust or win scenarios
+    
+    // Record the throw BEFORE checking for bust/win
+    final isWinningThrow = (after == 0);
+    
+    // Always record the throw first
+    scores[currentPlayer] = after;
+    currentGame.throws.add(DartThrow(
+      player: players[currentPlayer],
+      value: value,
+      multiplier: (value == 25 || value == 50) ? 1 : multiplier,
+      resultingScore: after,
+      timestamp: DateTime.now(),
+      wasBust: false,
+    ));
+    
+    // NOW handle bust or win scenarios
     if (_handleBustOrWin(after, value)) return;
 
-    // Normal scoring flow
-    _recordValidThrow(value, after);
+    // Continue with normal flow for non-bust, non-win throws
+    dartsThrown++;
+    if (dartsThrown >= 3) {
+      dartsThrown = 0;
+      _advanceTurn();
+    }
     
     // Reset multiplier and save history
     multiplier = 1;
@@ -268,28 +286,6 @@ class TraditionalGameController extends ChangeNotifier {
 
     // 6) notify UI
     notifyListeners();
-  }
-
-  /// Record a valid (non-bust, non-win) throw
-  void _recordValidThrow(int value, int afterScore) {
-    scores[currentPlayer] = afterScore;
-    
-    currentGame.throws.add(DartThrow(
-      player: players[currentPlayer],
-      value: value,
-      multiplier: (value == 25 || value == 50) ? 1 : multiplier,
-      resultingScore: afterScore,
-      timestamp: DateTime.now(),
-      wasBust: false,
-    ));
-    
-    dartsThrown++;
-
-    if (dartsThrown >= 3) {
-      // End of turn
-      dartsThrown = 0;
-      _advanceTurn();
-    }
   }
 
   /// Find the next active player starting from the given index
