@@ -1,17 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION: Imports
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:dars_scoring_app/models/game_history.dart';
-import 'package:dars_scoring_app/data/possible_finishes.dart';
+import 'package:dars_scoring_app/models/game_history.dart'; // Provides GameHistory and DartThrow
+import 'package:dars_scoring_app/data/possible_finishes.dart'; // Provides CheckoutRule and bestCheckouts
+import 'package:dars_scoring_app/services/history_repository.dart';
+import 'package:dars_scoring_app/services/sound_player.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION: TraditionalGameController
-// Encapsulates all scoring rules, state management, and history persistence.
+/// A controller that manages all scoring rules, player turns, and history persistence
+/// for a traditional darts game (e.g., 301, 501). It handles bust logic, finish rules,
+/// undo functionality, and sound/haptic feedback.
 class TraditionalGameController extends ChangeNotifier {
   // Constants for timing
   static const Duration _bustDisplayDuration = Duration(seconds: 2);
@@ -41,8 +41,9 @@ class TraditionalGameController extends ChangeNotifier {
   bool showPlayerFinished = false;
   String? lastFinisher;
 
-  // Internal dependencies
-  final AudioPlayer _audio = AudioPlayer();
+  // Internal services
+  final HistoryRepository _repo = HistoryRepository();
+  final SoundPlayer _sound = SoundPlayer();
   
   // Timers for cancellable operations
   Timer? _bustTimer;
@@ -67,14 +68,16 @@ class TraditionalGameController extends ChangeNotifier {
     return (idx + 1) % act.length;
   }
 
-  /// Return the score for a given player name
+  /// Returns the current score for the given player name.
   int scoreFor(String player) => scores[players.indexOf(player)];
 
-  /// Constructor: initializes state, resumes history if provided.
+  /// Creates a new game controller with [startingScore], [players], and optional [initialRule].
+  /// If [resumeGame] is provided, state is restored; if [initialRule] is provided, it overrides persisted preference.
   TraditionalGameController({
     required this.startingScore,
     required this.players,
     GameHistory? resumeGame,
+    CheckoutRule? initialRule,
   })  : currentGame = resumeGame ?? 
             GameHistory(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -85,25 +88,21 @@ class TraditionalGameController extends ChangeNotifier {
               completedAt: null,
               gameMode: startingScore,
             ),
-        checkoutRule = CheckoutRule.openFinish {
+        checkoutRule = initialRule ?? CheckoutRule.openFinish {
     // Initialize scores list
     scores = List<int>.filled(players.length, startingScore);
 
     // If resuming, load prior throws & scores
     if (resumeGame != null) _loadFromHistory(resumeGame);
 
-    // Async load of user‐preferred finish rule
-    _initCheckoutRule();
-
-    // Configure audio player
-    _audio.setReleaseMode(ReleaseMode.stop);
+    // Async load of user‐preferred finish rule only if not injected
+    if (initialRule == null) _initCheckoutRule();
   }
 
   /// Load the user's preferred checkout rule asynchronously
   Future<void> _initCheckoutRule() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      checkoutRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? 0];
+      checkoutRule = await _repo.getCheckoutRule() as CheckoutRule;
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading checkout rule: $e');
@@ -131,20 +130,19 @@ class TraditionalGameController extends ChangeNotifier {
   }
 
   /// Main scoring method: apply a throw value (0,1–20,25,50)
+  /// This method handles sound/haptic feedback, scoring, bust/win logic,
+  /// turn advancement, and debounced save to history.
   Future<void> score(int value) async {
-    // Play sound and give haptic feedback
-    _playDartSound();
-    
-    // On first dart of turn, remember starting score
+    // Play sound and haptic feedback
+    await _sound.playDartSound();
+     
+    // On first dart of the turn, record starting score for potential bust reset
     if (dartsThrown == 0) turnStartScore = scores[currentPlayer];
 
     // Calculate hit and resulting score
     final hit = _calculateEffectiveHit(value);
     final before = scores[currentPlayer];
     final after = before - hit;
-    
-    // Record the throw BEFORE checking for bust/win
-    final isWinningThrow = (after == 0);
     
     // Always record the throw first
     scores[currentPlayer] = after;
@@ -170,23 +168,8 @@ class TraditionalGameController extends ChangeNotifier {
     // Reset multiplier and save history
     multiplier = 1;
     currentGame.modifiedAt = DateTime.now();
-    _debouncedSaveHistory();
+    _debouncedSaveHistory();  // schedules _repo.saveGameHistory
     notifyListeners();
-  }
-
-  /// Play the dart throw sound with error handling
-  void _playDartSound() {
-    HapticFeedback.mediumImpact();
-    try {
-      _audio.stop().then((_) {
-        _audio.play(
-          AssetSource('sound/dart_throw.mp3'),
-          volume: 0.5,
-        );
-      });
-    } catch (e) {
-      debugPrint('Audio error: $e');
-    }
   }
 
   /// Calculate the effective hit value with multiplier
@@ -195,12 +178,15 @@ class TraditionalGameController extends ChangeNotifier {
     return (value == 25 || value == 50) ? value : value * multiplier;
   }
 
-  /// Handle bust or win scenarios, returns true if handled
+  /// Determine if a throw results in a bust or win based on the [checkoutRule].
+  /// Returns true if the throw was handled (bust or win), false otherwise.
   bool _handleBustOrWin(int afterScore, int dartValue) {
     bool isBust = false, isWin = false;
     
+    // Choose bust/win conditions for each finish rule
     switch (checkoutRule) {
       case CheckoutRule.doubleOut:
+        // Double-out: bust if score < 0 or exactly 1, win only on double or bull
         if (afterScore < 0 || afterScore == 1) {
           isBust = true;
         } else if (afterScore == 0 &&
@@ -208,6 +194,7 @@ class TraditionalGameController extends ChangeNotifier {
         else if (afterScore == 0) isWin = true;
         break;
       case CheckoutRule.extendedOut:
+        // Extended-out: similar to double, but allows triple 20 as a win
         if (afterScore < 0 || afterScore == 1) {
           isBust = true;
         } else if (afterScore == 0 &&
@@ -217,6 +204,7 @@ class TraditionalGameController extends ChangeNotifier {
         else if (afterScore == 0) isWin = true;
         break;
       case CheckoutRule.exactOut:
+        // Exact-out: win only if score is reduced to exactly 0
         if (afterScore < 0) {
           isBust = true;
         } else if (afterScore == 0) {
@@ -224,20 +212,19 @@ class TraditionalGameController extends ChangeNotifier {
         }
         break;
       case CheckoutRule.openFinish:
+        // Open finish: any score reduction to 0 or below is a win
         if (afterScore <= 0) isWin = true;
         break;
     }
 
     if (isBust) {
-      _handleBust();
+      _handleBust(); // handle bust reset and turn change
       return true;
     }
-    
     if (isWin) {
-      _handleWin();
+      _handleWin(); // record finisher and update state
       return true;
     }
-    
     return false;
   }
 
@@ -272,7 +259,7 @@ class TraditionalGameController extends ChangeNotifier {
       currentGame.winner = finisher;
       currentGame.completedAt = DateTime.now();
       lastWinner = finisher;
-      _saveHistory(); // immediate save for win
+      _repo.saveGameHistory(currentGame); // immediate save for win
     }
 
     // 3) mark them finished (but keep them in the list)
@@ -310,7 +297,7 @@ class TraditionalGameController extends ChangeNotifier {
   Future<void> undoLastThrow() async {
     if (currentGame.throws.isEmpty) return;
 
-    // Cancel any pending timers to avoid race conditions
+    // Cancel pending visual flashes/timers to prevent race conditions
     _bustTimer?.cancel();
     _turnChangeTimer?.cancel();
     showBust = false;
@@ -359,7 +346,7 @@ class TraditionalGameController extends ChangeNotifier {
       ..currentPlayer = currentPlayer
       ..dartsThrown = dartsThrown
       ..modifiedAt = DateTime.now();
-    await _saveHistory();
+    await _repo.saveGameHistory(currentGame);
     notifyListeners();
   }
 
@@ -386,38 +373,10 @@ class TraditionalGameController extends ChangeNotifier {
   void _debouncedSaveHistory() {
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDebounceDuration, () {
-      _saveHistory();
+      _repo.saveGameHistory(currentGame);
     });
   }
 
-  /// Persist the game history list in SharedPreferences
-  Future<void> _saveHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // sync the live state into the history record:
-      currentGame
-        ..currentPlayer = currentPlayer
-        ..dartsThrown = dartsThrown
-        ..modifiedAt = DateTime.now();
-
-      final games = prefs.getStringList('games_history') ?? [];
-      final json = jsonEncode(currentGame.toJson());
-      // Replace or append this game's entry
-      final idx = games.indexWhere((g) {
-        return jsonDecode(g)['id'] == currentGame.id;
-      });
-      if (idx < 0) {
-        games.add(json);
-      } else {
-        games[idx] = json;
-      }
-
-      await prefs.setStringList('games_history', games);
-    } catch (e) {
-      debugPrint('Error saving game history: $e');
-    }
-  }
-  
   @override
   void dispose() {
     // Clean up timers
@@ -426,7 +385,7 @@ class TraditionalGameController extends ChangeNotifier {
     _saveTimer?.cancel();
     
     // Dispose audio resources
-    _audio.dispose();
+    _sound.dispose();
     
     super.dispose();
   }

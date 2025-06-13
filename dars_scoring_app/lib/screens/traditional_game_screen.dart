@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
+import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/widgets/score_button.dart';
 import 'package:dars_scoring_app/widgets/overlay_animation.dart';
-import 'package:dars_scoring_app/data/possible_finishes.dart';
-import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
+import 'package:dars_scoring_app/data/possible_finishes.dart';
+import 'package:dars_scoring_app/widgets/player_info_card.dart';
 
 /// The main game screen for “traditional” scoring (e.g. 301/501/X01).
 /// Splits UI into:
@@ -18,12 +18,15 @@ class GameScreen extends StatefulWidget {
   final int startingScore;
   final List<String> players;
   final GameHistory? gameHistory;
+  /// Optional initial checkout rule; if provided, it overrides persisted preference.
+  final CheckoutRule? initialRule;
 
   const GameScreen({
     super.key,
     required this.startingScore,
     required this.players,
     this.gameHistory,
+    this.initialRule,
   });
 
   @override
@@ -53,6 +56,7 @@ class _GameScreenState extends State<GameScreen>
       startingScore: widget.startingScore,
       players: widget.players,
       resumeGame: widget.gameHistory,
+      initialRule: widget.initialRule,
     )..addListener(_onStateChanged);
 
     // Configure the “BUST” overlay animation (red flash)
@@ -201,59 +205,20 @@ class _GameScreenState extends State<GameScreen>
     return Scaffold(
       // AppBar with home button & game label, plus “Next” toggle
       appBar: AppBar(
-        backgroundColor:
-            Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[900]
-                : Colors.grey[200],
-        // Leading widget: home icon + label (pop to root)
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                Icons.home,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.grey,
-              ),
-              onPressed: () =>
-                  Navigator.of(context).popUntil((r) => r.isFirst),
-            ),
-            Text(
-              gameLabel,
-              style: TextStyle(
-                fontSize: 16 * scale,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.black87,
-              ),
-            ),
-          ],
+        // Use colors from theme
+        // backgroundColor and iconTheme come from AppBarTheme in ThemeData
+        // Leading: home icon and label
+        leading: IconButton(
+          icon: const Icon(Icons.home),
+          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
         ),
-        // Suppress default title/spacing
-        title: const SizedBox.shrink(),
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white70
-              : Colors.grey,
-        ),
-        // “Next” button in the AppBar actions
+        title: Text(gameLabel),
+        centerTitle: false,
         actions: [
-          GestureDetector(
-            onTap: () => setState(() => _showNextList = !_showNextList),
-            child: Padding(
-              padding: EdgeInsets.only(right: 16 * scale),
-              child: Center(
-                child: Text(
-                  'Next: ${shortenName(act[nxtIdx], maxLength: 12)} '
-                  '(${actScores[nxtIdx]})',
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
-                  ),
-                ),
-              ),
+          TextButton(
+            onPressed: () => setState(() => _showNextList = !_showNextList),
+            child: Text(
+              'Next: ${shortenName(act[nxtIdx], maxLength: 12)} (${actScores[nxtIdx]})',
             ),
           ),
         ],
@@ -273,8 +238,8 @@ class _GameScreenState extends State<GameScreen>
                   child: Stack(
                     children: [
                       // Core player info (score, name, last darts, possible finish)
-                      _buildPlayerInfoCard(
-                        context,
+                      PlayerInfoCard(
+                        ctrl: _ctrl,
                         playerNameFontSize: playerNameFontSize,
                         playerScoreFontSize: playerScoreFontSize,
                         dartIconSize: dartIconSize,
@@ -542,14 +507,10 @@ class _GameScreenState extends State<GameScreen>
               right: 16 * scale,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[800]
-                      : Theme.of(context).cardColor,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(8 * scale),
                   border: Border.all(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade300
-                        : Colors.black,
+                    color: Theme.of(context).dividerColor,
                   ),
                 ),
                 child: Column(
@@ -598,192 +559,6 @@ class _GameScreenState extends State<GameScreen>
             ),
         ],
       ),
-    );
-  }
-
-  // ---- 6) Helper: Player info card (score + darts + finish hint) ----
-  Widget _buildPlayerInfoCard(
-    BuildContext context, {
-    required double playerNameFontSize,
-    required double playerScoreFontSize,
-    required double dartIconSize,
-    required double possibleFinishFontSize,
-  }) {
-    final act = _ctrl.activePlayers;
-    final actScores = act.map((p) => _ctrl.scoreFor(p)).toList();
-    final curIdx = _ctrl.activeCurrentIndex;
-
-    return Center(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        padding: EdgeInsets.symmetric(
-          vertical: 16 * (playerNameFontSize / 42),
-          horizontal: 24 * (playerNameFontSize / 42),
-        ),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[800]
-              : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(
-              16 * (playerNameFontSize / 42)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius:
-                  8 * (playerNameFontSize / 42),
-              offset: Offset(
-                  0, 2 * (playerNameFontSize / 42)),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Player name (shortened if too long)
-            Text(
-              shortenName(
-                  act[curIdx],
-                  maxLength: 12),
-              style: TextStyle(
-                fontSize: playerNameFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
-
-            // Current score
-            Text(
-              '${actScores[curIdx]}',
-              style: TextStyle(
-                fontSize: playerScoreFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
-
-            // Dart icons for this turn
-            _buildDartIcons(
-                context, iconSize: dartIconSize),
-
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
-
-            // Hint for possible finish
-            _buildPossibleFinish(
-                fontSize: possibleFinishFontSize),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---- 7) Helper: Render last-turn dart icons + remaining blank slots ----
-  Widget _buildDartIcons(
-      BuildContext context, {
-      double iconSize = 32,
-  }) {
-    final name =
-        _ctrl.players[_ctrl.currentPlayer];
-    final used =
-        (_ctrl.dartsThrown).clamp(0, 3);
-    final remaining = 3 - used;
-
-    // Grab only this player’s throws, then take the last [used]
-    final allThrows = _ctrl.currentGame.throws
-        .where((t) => t.player == name)
-        .toList();
-    final recent = allThrows.length >= used
-        ? allThrows.sublist(
-            allThrows.length - used)
-        : allThrows;
-
-    final activeTextStyle = TextStyle(
-      fontSize: iconSize * 0.8,
-      fontWeight: FontWeight.bold,
-      color: Theme.of(context).colorScheme.onSurface,
-    );
-
-    // Change dart‐icon color based on theme so it’s visible in dark mode
-    final iconColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white70
-        : Theme.of(context).primaryColor;
-
-    return Row(
-      mainAxisAlignment:
-          MainAxisAlignment.center,
-      children: [
-        // Show score labels for used darts
-        for (var t in recent) ...[
-          Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal:
-                    4 * (iconSize / 32)),
-            child: Text(
-              t.value == 0
-                  ? 'M'
-                  : t.value == 50
-                      ? 'BULL'
-                      : t.multiplier == 2
-                          ? 'D${t.value}'
-                          : t.multiplier == 3
-                              ? 'T${t.value}'
-                              : '${t.value}',
-              style: activeTextStyle,
-            ),
-          ),
-        ],
-
-        // Show blank dart icons for remaining throws
-        for (int i = 0; i < remaining; i++) ...[
-          Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal:
-                    4 * (iconSize / 32)),
-            child: SvgPicture.asset(
-              'assets/icons/dart-icon.svg',
-              width: iconSize,
-              height: iconSize,
-              colorFilter: ColorFilter.mode(
-                  iconColor, BlendMode.srcIn), // ← uses iconColor
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ---- 8) Helper: Possible finish hint based on `possibleFinishes` map ----
-  Widget _buildPossibleFinish(
-      {double fontSize = 18}) {
-    final score = _ctrl.scores[_ctrl.currentPlayer];
-    final dartsLeft = 3 - _ctrl.dartsThrown;
-    final options = bestCheckouts(
-      score,
-      dartsLeft,
-      _ctrl.checkoutRule,
-      limit: 3,    // top 3
-    );
-
-    if (options.isNotEmpty) {
-      // pick the very best one, or show all 3
-      final best = options.first;
-      return Text(
-        'Best finish: ${best.join(" ")}',
-        style: TextStyle(fontSize: fontSize, color: Colors.grey[600]),
-      );
-    }
-
-    // Otherwise no legal finish
-    return Text(
-      'No finish possible',
-      style: TextStyle(
-          fontSize: fontSize,
-          color: Colors.grey[600]),
     );
   }
 }

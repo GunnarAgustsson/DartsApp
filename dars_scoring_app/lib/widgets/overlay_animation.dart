@@ -34,13 +34,15 @@ class OverlayAnimation extends StatelessWidget {
       ),
       child: Center(
         child: showBust
-            ? Text('BUST',
+            ? Text(
+                'BUST',
                 style: TextStyle(
                   fontSize: bustFontSize,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onPrimary,
                   letterSpacing: 4,
-                ))
+                ),
+              )
             : showTurnChange
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -50,7 +52,7 @@ class OverlayAnimation extends StatelessWidget {
                         style: TextStyle(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
@@ -58,7 +60,7 @@ class OverlayAnimation extends StatelessWidget {
                         lastTurnLabels,
                         style: TextStyle(
                           fontSize: turnTextFontSize,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
@@ -67,7 +69,7 @@ class OverlayAnimation extends StatelessWidget {
                         style: TextStyle(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                     ],
