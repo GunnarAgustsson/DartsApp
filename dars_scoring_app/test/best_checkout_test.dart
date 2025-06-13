@@ -156,4 +156,41 @@ void main() {
       expect(result.first, equals(['T17']));
     });
   });
+  
+  group('bestCheckouts (openFinish)', () {
+    test('single‐dart S20 finish under openFinish for 20', () {
+      final result = bestCheckouts(20, 1, CheckoutRule.openFinish);
+      expect(result.first, equals(['S20']));
+    });
+
+    test('single‐dart T20 finish under openFinish for 20 with 2 darts', () {
+      final result = bestCheckouts(20, 2, CheckoutRule.openFinish);
+      expect(result.first, equals(['S20']));
+    });
+
+    test('single‐dart S1 finish under openFinish for 1', () {
+      final result = bestCheckouts(1, 1, CheckoutRule.openFinish);
+      expect(result.first, equals(['S1']));
+    });
+
+    test('single‐dart DB finish under openFinish for 40', () {
+      final result = bestCheckouts(40, 1, CheckoutRule.openFinish);
+      expect(result.first, equals(['D20']));
+    });
+
+    test('single‐dart D15 finish under openFinish for 30', () {
+      final result = bestCheckouts(30, 1, CheckoutRule.openFinish);
+      expect(result.first, equals(['D15']));
+    });
+    
+    test('one-dart T20 finish under openFinish for 60', () {
+      final result = bestCheckouts(60, 2, CheckoutRule.openFinish);
+      expect(result.first, equals(['T20']));
+    });
+
+    test('three‐dart T20,T20,DB finish under openFinish for 170', () {
+      final result = bestCheckouts(170, 3, CheckoutRule.openFinish);
+      expect(result.first, equals(['T20', 'T20', 'DB']));
+    });
+  });
 }

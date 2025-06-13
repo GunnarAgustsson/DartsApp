@@ -162,6 +162,40 @@ List<List<String>> bestCheckouts(
         return vb.compareTo(va);
       }
 
+      if (rule == CheckoutRule.openFinish) {
+        // First prioritize exact finishes over over-finishes
+        final totalA = a.map(_scoreOf).reduce((sum, val) => sum + val);
+        final totalB = b.map(_scoreOf).reduce((sum, val) => sum + val);
+        
+        // Exact finishes come first
+        if (totalA == remainingScore && totalB > remainingScore) return -1;
+        if (totalB == remainingScore && totalA > remainingScore) return 1;
+        
+        // If both are exact or both are over, prefer the one closest to the target
+        if (totalA != totalB) {
+          // If both are over, prefer the one closest to the target
+          if (totalA > remainingScore && totalB > remainingScore) {
+            return totalA.compareTo(totalB);
+          }
+        }
+        
+        // For same scores, prefer simpler dart types (Singles > Doubles > Triples)
+        int dartTypePriority(String code) {
+          if (code.startsWith('S')) return 0;
+          if (code.startsWith('D')) return 1;
+          if (code == 'DB' || code == '25') return 2;
+          if (code.startsWith('T')) return 3;
+          return 4;
+        }
+        
+        final lastDartPriorityA = dartTypePriority(a.last);
+        final lastDartPriorityB = dartTypePriority(b.last);
+        
+        if (lastDartPriorityA != lastDartPriorityB) {
+          return lastDartPriorityA.compareTo(lastDartPriorityB);
+        }
+      }
+
       if (rule == CheckoutRule.extendedOut) {
         // must finish on D or T (including DB) but prefer pure doubles > DB > trebles
         int finishPriority(String code) {
