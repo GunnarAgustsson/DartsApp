@@ -6,8 +6,9 @@ import 'package:dars_scoring_app/widgets/overlay_animation.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
+import 'package:dars_scoring_app/theme/app_dimensions.dart';
 
-/// The main game screen for “traditional” scoring (e.g. 301/501/X01).
+/// The main game screen for "traditional" scoring (e.g. 301/501/X01).
 /// Splits UI into:
 ///  - Player info card (score + last darts + possible finish)
 ///  - Multiplier selector (x1/x2/x3)
@@ -18,12 +19,14 @@ class GameScreen extends StatefulWidget {
   final int startingScore;
   final List<String> players;
   final GameHistory? gameHistory;
+  final CheckoutRule? checkoutRule;
 
   const GameScreen({
     super.key,
     required this.startingScore,
     required this.players,
     this.gameHistory,
+    this.checkoutRule,
   });
 
   @override
@@ -41,35 +44,60 @@ class _GameScreenState extends State<GameScreen>
   // ---- 2) Game logic controller (abstracts scoring, history, rules) ----
   late final TraditionalGameController _ctrl;
 
-  // Toggle for showing the “next player” dropdown
+  // Toggle for showing the "next player" dropdown
   bool _showNextList = false;
+
+  // Track if animation is in progress to disable buttons
+  bool _isAnimating = false;
 
   bool _hasShownFinishDialog = false; // ensure we only show once
 
   @override
   void initState() {
-    super.initState();
-    _ctrl = TraditionalGameController(
+    super.initState();    _ctrl = TraditionalGameController(
       startingScore: widget.startingScore,
       players: widget.players,
       resumeGame: widget.gameHistory,
+      checkoutRule: widget.checkoutRule,
     )..addListener(_onStateChanged);
-
-    // Configure the “BUST” overlay animation (red flash)
+    
+    // Configure the "BUST" overlay animation (red flash)
     _bustController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(seconds: 2), // Increased to 2 seconds for visibility
     );
-    _bustColorAnim = ColorTween(begin: Colors.red, end: Colors.red)
-        .animate(_bustController);
+    _bustColorAnim = ColorTween(
+      begin: Colors.red, 
+      end: Colors.transparent,
+    ).animate(_bustController);
+    
+    // Add listener to track animation state
+    _bustController.addStatusListener((status) {
+      if (status == AnimationStatus.forward) {
+        setState(() => _isAnimating = true);
+      } else if (status == AnimationStatus.completed) {
+        setState(() => _isAnimating = false);
+      }
+    });
 
-    // Configure the “Turn Change” overlay animation (blue flash)
+    // Configure the "Turn Change" overlay animation (blue flash)
     _turnController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(seconds: 2), // Increased to 2 seconds for visibility
     );
-    _turnColorAnim = ColorTween(begin: Colors.blue, end: Colors.blue)
-        .animate(_turnController);
+    _turnColorAnim = ColorTween(
+      begin: Colors.blue, 
+      end: Colors.transparent,
+    ).animate(_turnController);
+    
+    // Add listener to track animation state
+    _turnController.addStatusListener((status) {
+      if (status == AnimationStatus.forward) {
+        setState(() => _isAnimating = true);
+      } else if (status == AnimationStatus.completed) {
+        setState(() => _isAnimating = false);
+      }
+    });
   }
 
   @override
@@ -99,24 +127,31 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _showFinishDialog(String finisher) {
+    final theme = Theme.of(context);
     final remaining = _ctrl.activePlayers.length;
     final title = remaining > 0
         ? 'Congratulations, $finisher!'
         : 'Game Over';
     final content = remaining > 0
-        ? Text('$finisher has finished!\nRemaining: ${_ctrl.activePlayers.join(", ")}')
-        : const Text('All players have finished.');
+        ? Text(
+            '$finisher has finished!\nRemaining: ${_ctrl.activePlayers.join(", ")}',
+            style: theme.textTheme.bodyMedium,
+          )
+        : Text(
+            'All players have finished.',
+            style: theme.textTheme.bodyMedium,
+          );
 
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text(title),
+        title: Text(title, style: theme.textTheme.titleLarge),
         content: content,
         actions: [
           if (remaining > 0)
             TextButton(
-              child: const Text('Continue'),
+              child: Text('Continue', style: theme.textTheme.labelMedium),
               onPressed: () {
                 Navigator.of(context).pop();
                 _ctrl.clearPlayerFinishedFlag();
@@ -125,7 +160,7 @@ class _GameScreenState extends State<GameScreen>
               },
             ),
           TextButton(
-            child: const Text('Play Again'),
+            child: Text('Play Again', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).pop();
               Navigator.of(context).pushReplacement(
@@ -139,7 +174,7 @@ class _GameScreenState extends State<GameScreen>
             },
           ),
           TextButton(
-            child: const Text('Main Menu'),
+            child: Text('Main Menu', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
@@ -152,7 +187,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   Widget build(BuildContext context) {
     final act = _ctrl.activePlayers;
-    // GUARD: if empty, don’t index into act[curIdx]
+    // GUARD: if empty, don't index into act[curIdx]
     if (act.isEmpty) {
       return const Scaffold(
         body: SizedBox.expand(),
@@ -171,87 +206,44 @@ class _GameScreenState extends State<GameScreen>
     final gameLabel = '${widget.startingScore}-pt Game';
 
     // ---- 4) Responsive layout constants ----
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-    final scale = width / 390;
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+    final isTablet = size.shortestSide >= 600;
+    final isLandscape = width > height;
+    
+    // Theme
+    final theme = Theme.of(context);
+      // Base scale factor for responsive sizing - using height-based scaling now
 
-    // Heights, widths, font sizes scaled relative to a base iPhone screen width
-    final playerCardHeight = height * 0.35;
-    final gridButtonHeight = 42 * scale;
-    final gridButtonWidth = 72 * scale;
-    final sectionSpacing = 10 * scale;
-    final betweenButtonSpacing = 10 * scale;
-    final playerNameFontSize = 32 * scale;
-    final playerScoreFontSize = 64 * scale;
-    final dartIconSize = 32 * scale;
-    final possibleFinishFontSize = 16 * scale;
-    final overlayBustFontSize = 32 * scale;
-    final overlayTurnNameFontSize = 40 * scale;
-    final overlayTurnTextFontSize = 28 * scale;
-    final scoreButtonFontSize = 18 * scale;
-    final multiplierButtonWidth = 96 * scale;
-    final multiplierButtonHeight = 52 * scale;
-    final multiplierButtonFontSize = 20 * scale;
-    final missUndoButtonWidth = 124 * scale;
-    final missUndoButtonHeight = 42 * scale;
-    final missUndoButtonFontSize = 16 * scale;
-    final missUndoIconSize = 16 * scale;
-
-    // ---- 5) Build the Scaffold with AppBar + Body ----
     return Scaffold(
-      // AppBar with home button & game label, plus “Next” toggle
+      // AppBar with home button & game label, plus "Next" toggle
       appBar: AppBar(
-        backgroundColor:
-            Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[900]
-                : Colors.grey[200],
+        backgroundColor: theme.colorScheme.surface,
+        elevation: AppDimensions.elevationS,
         // Leading widget: home icon + label (pop to root)
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                Icons.home,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.grey,
-              ),
-              onPressed: () =>
-                  Navigator.of(context).popUntil((r) => r.isFirst),
-            ),
-            Text(
-              gameLabel,
-              style: TextStyle(
-                fontSize: 16 * scale,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.black87,
-              ),
-            ),
-          ],
+        leading: IconButton(
+          icon: Icon(
+            Icons.home,
+            color: theme.colorScheme.onSurface,
+          ),
+          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
         ),
-        // Suppress default title/spacing
-        title: const SizedBox.shrink(),
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white70
-              : Colors.grey,
+        // Title
+        title: Text(
+          gameLabel,
+          style: theme.textTheme.titleMedium,
         ),
-        // “Next” button in the AppBar actions
+        // "Next" button in the AppBar actions
         actions: [
           GestureDetector(
             onTap: () => setState(() => _showNextList = !_showNextList),
             child: Padding(
-              padding: EdgeInsets.only(right: 16 * scale),
+              padding: const EdgeInsets.only(right: AppDimensions.paddingM),
               child: Center(
                 child: Text(
-                  'Next: ${shortenName(act[nxtIdx], maxLength: 12)} '
-                  '(${actScores[nxtIdx]})',
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
-                  ),
+                  'Next: ${shortenName(act[nxtIdx], maxLength: 12)} (${actScores[nxtIdx]})',
+                  style: theme.textTheme.bodyMedium,
                 ),
               ),
             ),
@@ -263,376 +255,468 @@ class _GameScreenState extends State<GameScreen>
       body: Stack(
         children: [
           SafeArea(
+            child: isLandscape 
+                ? _buildLandscapeLayout(context, showBust, showTurnChange, isTurnChanging, act, curIdx, nxtIdx, actScores)
+                : _buildPortraitLayout(context, showBust, showTurnChange, isTurnChanging, act, curIdx, nxtIdx, actScores),
+          ),
+
+          // ---- 5c) Next-player dropdown overlay ----
+          if (_showNextList)
+            _buildNextPlayersList(act, curIdx, nxtIdx, actScores),
+        ],
+      ),
+    );
+  }
+  
+  /// Build landscape layout with player info on left, controls on right
+  Widget _buildLandscapeLayout(
+    BuildContext context,
+    bool showBust,
+    bool showTurnChange,
+    bool isTurnChanging,
+    List<String> activePlayers,
+    int curIdx,
+    int nxtIdx,
+    List<int> actScores,
+  ) {
+    final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
+    final isTablet = size.shortestSide >= 600;
+    
+    return Row(
+      children: [
+        // Left side - Player info
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
             child: Column(
               children: [
-                SizedBox(height: sectionSpacing),
-
-                // ---- 5a) Player Info Card + Overlay Stack ----
-                SizedBox(
-                  height: playerCardHeight,
+                Expanded(
                   child: Stack(
                     children: [
-                      // Core player info (score, name, last darts, possible finish)
-                      _buildPlayerInfoCard(
-                        context,
-                        playerNameFontSize: playerNameFontSize,
-                        playerScoreFontSize: playerScoreFontSize,
-                        dartIconSize: dartIconSize,
-                        possibleFinishFontSize: possibleFinishFontSize,
-                      ),
-
-                      // Overlay (bust or turn-change) above the card
+                      // Core player info
+                      _buildPlayerInfoCard(context),
+                      
+                      // Overlay animations
                       if (showBust || showTurnChange)
                         Positioned.fill(
-                          child: AnimatedBuilder(
-                            // Listen to both controllers so color.value updates
-                            animation: Listenable.merge(
-                                [_bustController, _turnController]),
-                            builder: (_, __) {
-                              // Choose red or blue flash
-                              final bg = showBust
-                                  ? _bustColorAnim.value!
-                                  : _turnColorAnim.value!;
-                              return OverlayAnimation(
-                                showBust: showBust,
-                                showTurnChange: showTurnChange,
-                                bgColor: bg,
-                                lastTurnPoints:
-                                    _ctrl.lastTurnPoints(),
-                                lastTurnLabels:
-                                    _ctrl.lastTurnLabels(),
-                                nextPlayerName:
-                                    act[nxtIdx],
-                                bustFontSize: overlayBustFontSize,
-                                turnNameFontSize:
-                                    overlayTurnNameFontSize,
-                                turnTextFontSize:
-                                    overlayTurnTextFontSize,
-                              );
-                            },
-                          ),
+                          child: _buildOverlayAnimation(showBust, showTurnChange),
                         ),
-                    ],
-                  ),
-                ),
-
-                // ---- 5b) Controls Column (Multiplier + Grid + Miss/Undo) ----
-                Expanded(
-                  flex: 6,
-                  child: Column(
-                    children: [
-                      SizedBox(height: sectionSpacing),
-
-                      // Multiplier buttons (x2, x3)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: multiplierButtonWidth,
-                            height: multiplierButtonHeight,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    _ctrl.multiplier == 2
-                                        ? Colors.blue
-                                        : null,
-                                textStyle: TextStyle(
-                                    fontSize:
-                                        multiplierButtonFontSize),
-                              ),
-                              onPressed: () =>
-                                  _ctrl.setMultiplier(2),
-                              child: const Text('x2'),
-                            ),
-                          ),
-                          SizedBox(width: betweenButtonSpacing),
-                          SizedBox(
-                            width: multiplierButtonWidth,
-                            height: multiplierButtonHeight,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    _ctrl.multiplier == 3
-                                        ? Colors.blue
-                                        : null,
-                                textStyle: TextStyle(
-                                    fontSize:
-                                        multiplierButtonFontSize),
-                              ),
-                              onPressed: () =>
-                                  _ctrl.setMultiplier(3),
-                              child: const Text('x3'),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: sectionSpacing),
-
-                      // Number grid (1–20)
-                      ...List.generate(4, (row) {
-                        return Padding(
-                          padding:
-                              EdgeInsets.only(bottom: betweenButtonSpacing),
-                          child: Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.center,
-                            children:
-                                List.generate(5, (col) {
-                              final number =
-                                  row * 5 + col + 1;
-                              return Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal:
-                                        3 * scale),
-                                child: SizedBox(
-                                  width: gridButtonWidth,
-                                  height: gridButtonHeight,
-                                  child: ScoreButton(
-                                    value: number,
-                                    label: '$number',
-                                    fontSize:
-                                        scoreButtonFontSize,
-                                    disabled: isTurnChanging ||
-                                        showBust,
-                                    onPressed: () =>
-                                        _ctrl.score(number),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ),
-                        );
-                      }),
-
-                      // Row for 25 and Bull
-                      Padding(
-                        padding: EdgeInsets.only(
-                            bottom: sectionSpacing),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                                width: gridButtonWidth +
-                                    8 * scale),
-                            SizedBox(
-                              width: gridButtonWidth,
-                              height: gridButtonHeight,
-                              child: ScoreButton(
-                                value: 25,
-                                label: '25',
-                                fontSize:
-                                    scoreButtonFontSize,
-                                disabled: isTurnChanging ||
-                                    showBust,
-                                onPressed: () =>
-                                    _ctrl.score(25),
-                              ),
-                            ),
-                            SizedBox(width: 8 * scale),
-                            SizedBox(
-                              width: gridButtonWidth,
-                              height: gridButtonHeight,
-                              child: ScoreButton(
-                                value: 50,
-                                label: 'Bull',
-                                fontSize:
-                                    scoreButtonFontSize *
-                                        0.85,
-                                disabled: isTurnChanging ||
-                                    showBust,
-                                onPressed: () =>
-                                    _ctrl.score(50),
-                              ),
-                            ),
-                            SizedBox(
-                                width: gridButtonWidth +
-                                    8 * scale),
-                          ],
-                        ),
-                      ),
-
-                      // Miss and Undo buttons
-                      SizedBox(height: sectionSpacing * 2),
-                      Padding(
-                        padding: EdgeInsets.only(
-                            top: 0, bottom: 24 * scale),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            // Miss = score(0)
-                            SizedBox(
-                              width: missUndoButtonWidth,
-                              height: missUndoButtonHeight,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.red,
-                                  foregroundColor:
-                                      Colors.white,
-                                  textStyle: TextStyle(
-                                      fontSize:
-                                          missUndoButtonFontSize),
-                                ),
-                                onPressed:
-                                    (isTurnChanging ||
-                                            showBust)
-                                        ? null
-                                        : () =>
-                                            _ctrl.score(0),
-                                icon: Icon(
-                                    Icons.cancel_outlined,
-                                    size: missUndoIconSize),
-                                label: const Text('Miss'),
-                              ),
-                            ),
-
-                            SizedBox(
-                                width:
-                                    betweenButtonSpacing),
-
-                            // Undo = undoLastThrow()
-                            SizedBox(
-                              width: missUndoButtonWidth,
-                              height: missUndoButtonHeight,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.red,
-                                  foregroundColor:
-                                      Colors.white,
-                                  textStyle:
-                                      TextStyle(
-                                          fontSize:
-                                              missUndoButtonFontSize),
-                                  padding:
-                                      EdgeInsets.symmetric(
-                                          horizontal:
-                                              8 * scale),
-                                ),
-                                onPressed:
-                                    (isTurnChanging ||
-                                            showBust)
-                                        ? null
-                                        : _ctrl
-                                            .undoLastThrow,
-                                icon: Icon(Icons.undo,
-                                    size:
-                                        missUndoIconSize),
-                                label: const Text('Undo'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-
-          // ---- 5c) Next-player dropdown overlay ----
-          if (_showNextList)
-            Positioned(
-              top: kToolbarHeight,
-              left: 16 * scale,
-              right: 16 * scale,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[800]
-                      : Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(8 * scale),
-                  border: Border.all(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade300
-                        : Colors.black,
-                  ),
+        ),
+        
+        // Vertical divider
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: theme.colorScheme.outline.withOpacity(0.5),
+        ),
+        
+        // Right side - Controls
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            child: Column(
+              children: [
+                // Multiplier buttons
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+                  child: _buildMultiplierButtons(isTurnChanging, showBust),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: act
-                      .asMap()
-                      .entries
-                      .map((entry) {
-                    final idx = entry.key;
-                    final name = shortenName(
-                        entry.value,
-                        maxLength: 12);
-                    final pts = actScores[idx];
-                    final isCurrent =
-                        idx == curIdx;
-                    final isUpcoming =
-                        idx == nxtIdx;
+                
+                // Score grid
+                Expanded(
+                  child: _buildScoreButtonsGrid(isTurnChanging, showBust, isTablet),
+                ),
+                
+                // Miss/Undo row
+                Padding(
+                  padding: const EdgeInsets.only(top: AppDimensions.paddingM),
+                  child: _buildMissUndoButtons(isTurnChanging, showBust),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  /// Build portrait layout with player info on top, controls below
+  Widget _buildPortraitLayout(
+    BuildContext context,
+    bool showBust,
+    bool showTurnChange,
+    bool isTurnChanging,
+    List<String> activePlayers,
+    int curIdx,
+    int nxtIdx,
+    List<int> actScores,
+  ) {
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    final isTablet = size.shortestSide >= 600;
+    
+    return Column(
+      children: [
+        const SizedBox(height: AppDimensions.paddingS),        // ---- 5a) Player Info Card + Overlay Stack ----
+        SizedBox(
+          height: height * 0.3, // 30% of screen height
+          child: Stack(
+            children: [
+              // Core player info
+              _buildPlayerInfoCard(context),
+              
+              // Overlay animations
+              if (showBust || showTurnChange)
+                Positioned.fill(
+                  child: _buildOverlayAnimation(showBust, showTurnChange),
+                ),
+            ],
+          ),
+        ),
 
-                    return ListTile(
-                      dense: true,
-                      leading: isCurrent
-                          ? Icon(Icons.arrow_right,
-                              color: Colors.green)
-                          : SizedBox(
-                              width: 24 * scale),
-                      title: Text(
-                        name,
-                        style: TextStyle(
-                          fontWeight: isCurrent
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isUpcoming
-                              ? Colors.blue
-                              : isCurrent
-                                  ? Colors.green
-                                  : null,
-                        ),
-                      ),
-                      trailing: Text('$pts'),
-                      onTap: () => setState(
-                          () => _showNextList = false),
-                    );
-                  }).toList(),
+        // ---- 5b) Controls Column (Multiplier + Grid + Miss/Undo) ----
+        Expanded(
+          child: Column(
+            children: [
+              const SizedBox(height: AppDimensions.paddingS),
+
+              // Multiplier buttons
+              _buildMultiplierButtons(isTurnChanging, showBust),
+
+              const SizedBox(height: AppDimensions.paddingS),
+
+              // Score grid
+              Expanded(
+                child: _buildScoreButtonsGrid(isTurnChanging, showBust, isTablet),
+              ),
+
+              // Miss and Undo buttons
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppDimensions.paddingM,
+                ),
+                child: _buildMissUndoButtons(isTurnChanging, showBust),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+    /// Build multiplier row buttons
+  Widget _buildMultiplierButtons(bool isTurnChanging, bool showBust) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    final isTablet = size.shortestSide >= 600;
+    
+    // Height-based scaling
+    final heightScale = height / 800;
+    
+    // Button is disabled during animations, turn changes, or busts
+    final isDisabled = _isAnimating || isTurnChanging || showBust;
+    
+    // Calculate button dimensions based on height
+    final buttonWidth = isTablet ? 120.0 : 96.0 * heightScale;
+    final buttonHeight = isTablet ? 60.0 : 52.0 * heightScale;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _ctrl.multiplier == 1 
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              foregroundColor: _ctrl.multiplier == 1
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            onPressed: isDisabled ? null : () => _ctrl.setMultiplier(1),
+            child: Text('x1', style: theme.textTheme.titleMedium),
+          ),
+        ),
+        SizedBox(width: AppDimensions.marginM * heightScale),
+        SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _ctrl.multiplier == 2
+                  ? theme.colorScheme.secondary
+                  : theme.colorScheme.surfaceContainerHighest,
+              foregroundColor: _ctrl.multiplier == 2
+                  ? theme.colorScheme.onSecondary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            onPressed: isDisabled ? null : () => _ctrl.setMultiplier(2),
+            child: Text('x2', style: theme.textTheme.titleMedium),
+          ),
+        ),
+        SizedBox(width: AppDimensions.marginM * heightScale),
+        SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _ctrl.multiplier == 3
+                  ? theme.colorScheme.tertiary
+                  : theme.colorScheme.surfaceContainerHighest,
+              foregroundColor: _ctrl.multiplier == 3
+                  ? theme.colorScheme.onTertiary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            onPressed: isDisabled ? null : () => _ctrl.setMultiplier(3),
+            child: Text('x3', style: theme.textTheme.titleMedium),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  /// Build score buttons grid for 1-20, 25, Bull
+  Widget _buildScoreButtonsGrid(bool isTurnChanging, bool showBust, bool isTablet) {
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    
+    // Screen height-based scaling
+    final heightScale = height / 800; // Base scale on a height of 800
+    
+    // Always use a portrait layout since we've locked orientation
+    final int crossAxisCount = isTablet ? 6 : 5;
+      return GridView.builder(
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM * heightScale
+      ),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 1.0,
+        crossAxisSpacing: isTablet ? AppDimensions.marginM : AppDimensions.marginM * heightScale,
+        mainAxisSpacing: isTablet ? AppDimensions.marginM : AppDimensions.marginM * heightScale,
+      ),
+      itemCount: 22, // 1-20 + 25 + Bull
+      itemBuilder: (context, index) {
+        // Map grid position to score value
+        int value;
+        String label;
+        
+        if (index < 20) {
+          // Regular numbers 1-20
+          value = index + 1;
+          label = value.toString();
+        } else if (index == 20) {
+          // 25 (outer bull)
+          value = 25;
+          label = '25';
+        } else {
+          // Bull (50)
+          value = 50;
+          label = 'Bull';
+        }
+          // Determine button size based on screen height
+        final heightScale = height / 800;
+        // Use smaller button sizes based on screen height
+        final buttonSize = isTablet 
+            ? ScoreButtonSize.medium 
+            : (heightScale >= 1.0 ? ScoreButtonSize.small : ScoreButtonSize.small);
+        
+        // Button is disabled during animations, turn changes, or busts
+        final isDisabled = _isAnimating || isTurnChanging || showBust;
+        
+        return ScoreButton(
+          value: value,
+          label: label,
+          size: buttonSize,
+          disabled: isDisabled,
+          onPressed: () => _ctrl.score(value),
+        );
+      },
+    );
+  }
+    /// Build miss and undo buttons
+  Widget _buildMissUndoButtons(bool isTurnChanging, bool showBust) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    final isTablet = size.shortestSide >= 600;
+    
+    // Height-based scaling
+    final heightScale = height / 800;
+    
+    // Button is disabled during animations, turn changes, or busts
+    final isDisabled = _isAnimating || isTurnChanging || showBust;
+    
+    // Calculate button dimensions based on height
+    final buttonWidth = isTablet ? 150.0 : 124.0 * heightScale;
+    final buttonHeight = isTablet ? 56.0 : 48.0 * heightScale;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Miss = score(0)
+        SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
+            ),
+            onPressed: isDisabled
+                ? null
+                : () => _ctrl.score(0),
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('Miss'),
+          ),
+        ),
+
+        SizedBox(width: AppDimensions.marginM * heightScale),
+
+        // Undo = undoLastThrow()
+        SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.secondary,
+              foregroundColor: theme.colorScheme.onSecondary,
+            ),
+            onPressed: isDisabled
+                ? null
+                : _ctrl.undoLastThrow,
+            icon: const Icon(Icons.undo),
+            label: const Text('Undo'),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  /// Build overlay for animations (bust or turn change)
+  Widget _buildOverlayAnimation(bool showBust, bool showTurnChange) {
+    return AnimatedBuilder(
+      // Listen to both controllers so color.value updates
+      animation: Listenable.merge([_bustController, _turnController]),
+      builder: (_, __) {
+        // Choose red or blue flash color
+        final bgColor = showBust
+            ? _bustColorAnim.value!
+            : _turnColorAnim.value!;
+              return OverlayAnimation(
+          showBust: showBust,
+          showTurnChange: showTurnChange,
+          bgColor: bgColor,
+          lastTurnPoints: _ctrl.lastTurnPoints(),
+          lastTurnLabels: _ctrl.lastTurnLabels(),
+          nextPlayerName: _ctrl.activePlayers[_ctrl.activeNextIndex],
+          size: OverlaySize.large,
+        );
+      },
+    );
+  }
+  
+  /// Build next players dropdown list
+  Widget _buildNextPlayersList(
+    List<String> activePlayers,
+    int curIdx,
+    int nxtIdx,
+    List<int> actScores,
+  ) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final scale = size.width / 390;
+    
+    return Positioned(
+      top: kToolbarHeight,
+      left: AppDimensions.paddingM,
+      right: AppDimensions.paddingM,
+      child: Card(
+        elevation: AppDimensions.elevationM,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: activePlayers
+              .asMap()
+              .entries
+              .map((entry) {
+            final idx = entry.key;
+            final name = shortenName(entry.value, maxLength: 12);
+            final pts = actScores[idx];
+            final isCurrent = idx == curIdx;
+            final isUpcoming = idx == nxtIdx;
+
+            return ListTile(
+              dense: true,
+              leading: isCurrent
+                  ? Icon(Icons.arrow_right, color: theme.colorScheme.primary)
+                  : SizedBox(width: 24 * scale),
+              title: Text(
+                name,
+                style: TextStyle(
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  color: isUpcoming
+                      ? theme.colorScheme.secondary
+                      : isCurrent
+                          ? theme.colorScheme.primary
+                          : null,
                 ),
               ),
-            ),
-        ],
+              trailing: Text(
+                '$pts',
+                style: theme.textTheme.titleMedium,
+              ),
+              onTap: () => setState(() => _showNextList = false),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
   // ---- 6) Helper: Player info card (score + darts + finish hint) ----
-  Widget _buildPlayerInfoCard(
-    BuildContext context, {
-    required double playerNameFontSize,
-    required double playerScoreFontSize,
-    required double dartIconSize,
-    required double possibleFinishFontSize,
-  }) {
+  Widget _buildPlayerInfoCard(BuildContext context) {    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+    final isTablet = size.shortestSide >= 600;
+    final isLandscape = width > height;
+    final dartIconSize = isTablet ? 40.0 : 32.0;
+    
     final act = _ctrl.activePlayers;
     final actScores = act.map((p) => _ctrl.scoreFor(p)).toList();
     final curIdx = _ctrl.activeCurrentIndex;
 
     return Center(
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
+        width: isLandscape 
+            ? double.infinity
+            : width * 0.9,
         padding: EdgeInsets.symmetric(
-          vertical: 16 * (playerNameFontSize / 42),
-          horizontal: 24 * (playerNameFontSize / 42),
+          vertical: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+          horizontal: isTablet ? AppDimensions.paddingXL : AppDimensions.paddingL,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[800]
-              : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(
-              16 * (playerNameFontSize / 42)),
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius:
-                  8 * (playerNameFontSize / 42),
-              offset: Offset(
-                  0, 2 * (playerNameFontSize / 42)),
+              color: theme.colorScheme.shadow.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -641,41 +725,31 @@ class _GameScreenState extends State<GameScreen>
           children: [
             // Player name (shortened if too long)
             Text(
-              shortenName(
-                  act[curIdx],
-                  maxLength: 12),
-              style: TextStyle(
-                fontSize: playerNameFontSize,
+              shortenName(act[curIdx], maxLength: 12),
+              style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
               overflow: TextOverflow.ellipsis,
             ),
 
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
-
-            // Current score
+            const SizedBox(height: AppDimensions.marginS),            // Current score - Scale based on screen height
             Text(
               '${actScores[curIdx]}',
-              style: TextStyle(
-                fontSize: playerScoreFontSize,
+              style: theme.textTheme.displayLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                fontSize: isTablet ? 72.0 : 56.0 * (height / 800),
               ),
             ),
 
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
+            const SizedBox(height: AppDimensions.marginM),
 
             // Dart icons for this turn
-            _buildDartIcons(
-                context, iconSize: dartIconSize),
+            _buildDartIcons(context, iconSize: dartIconSize),
 
-            SizedBox(height:
-                8 * (playerNameFontSize / 42)),
+            const SizedBox(height: AppDimensions.marginM),
 
             // Hint for possible finish
-            _buildPossibleFinish(
-                fontSize: possibleFinishFontSize),
+            _buildPossibleFinish(fontSize: isTablet ? 18.0 : 14.0),
           ],
         ),
       ),
@@ -683,46 +757,37 @@ class _GameScreenState extends State<GameScreen>
   }
 
   // ---- 7) Helper: Render last-turn dart icons + remaining blank slots ----
-  Widget _buildDartIcons(
-      BuildContext context, {
-      double iconSize = 32,
-  }) {
-    final name =
-        _ctrl.players[_ctrl.currentPlayer];
-    final used =
-        (_ctrl.dartsThrown).clamp(0, 3);
+  Widget _buildDartIcons(BuildContext context, {double iconSize = 32}) {
+    final theme = Theme.of(context);
+    final name = _ctrl.players[_ctrl.currentPlayer];
+    final used = (_ctrl.dartsThrown).clamp(0, 3);
     final remaining = 3 - used;
 
-    // Grab only this player’s throws, then take the last [used]
+    // Grab only this player's throws, then take the last [used]
     final allThrows = _ctrl.currentGame.throws
         .where((t) => t.player == name)
         .toList();
     final recent = allThrows.length >= used
-        ? allThrows.sublist(
-            allThrows.length - used)
+        ? allThrows.sublist(allThrows.length - used)
         : allThrows;
 
     final activeTextStyle = TextStyle(
       fontSize: iconSize * 0.8,
       fontWeight: FontWeight.bold,
-      color: Theme.of(context).colorScheme.onSurface,
+      color: theme.colorScheme.onSurface,
     );
 
-    // Change dart‐icon color based on theme so it’s visible in dark mode
-    final iconColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white70
-        : Theme.of(context).primaryColor;
+    // Get icon color from theme
+    final iconColor = theme.colorScheme.primary;
 
     return Row(
-      mainAxisAlignment:
-          MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Show score labels for used darts
         for (var t in recent) ...[
           Padding(
             padding: EdgeInsets.symmetric(
-                horizontal:
-                    4 * (iconSize / 32)),
+                horizontal: 4 * (iconSize / 32)),
             child: Text(
               t.value == 0
                   ? 'M'
@@ -742,14 +807,13 @@ class _GameScreenState extends State<GameScreen>
         for (int i = 0; i < remaining; i++) ...[
           Padding(
             padding: EdgeInsets.symmetric(
-                horizontal:
-                    4 * (iconSize / 32)),
+                horizontal: 4 * (iconSize / 32)),
             child: SvgPicture.asset(
               'assets/icons/dart-icon.svg',
               width: iconSize,
               height: iconSize,
               colorFilter: ColorFilter.mode(
-                  iconColor, BlendMode.srcIn), // ← uses iconColor
+                  iconColor, BlendMode.srcIn),
             ),
           ),
         ],
@@ -758,15 +822,15 @@ class _GameScreenState extends State<GameScreen>
   }
 
   // ---- 8) Helper: Possible finish hint based on `possibleFinishes` map ----
-  Widget _buildPossibleFinish(
-      {double fontSize = 18}) {
+  Widget _buildPossibleFinish({double fontSize = 14}) {
+    final theme = Theme.of(context);
     final score = _ctrl.scores[_ctrl.currentPlayer];
     final dartsLeft = 3 - _ctrl.dartsThrown;
     final options = bestCheckouts(
       score,
       dartsLeft,
       _ctrl.checkoutRule,
-      limit: 3,    // top 3
+      limit: 3, // top 3
     );
 
     if (options.isNotEmpty) {
@@ -774,7 +838,10 @@ class _GameScreenState extends State<GameScreen>
       final best = options.first;
       return Text(
         'Best finish: ${best.join(" ")}',
-        style: TextStyle(fontSize: fontSize, color: Colors.grey[600]),
+        style: TextStyle(
+          fontSize: fontSize,
+          color: theme.colorScheme.primary,
+        ),
       );
     }
 
@@ -782,8 +849,9 @@ class _GameScreenState extends State<GameScreen>
     return Text(
       'No finish possible',
       style: TextStyle(
-          fontSize: fontSize,
-          color: Colors.grey[600]),
+        fontSize: fontSize,
+        color: theme.colorScheme.onSurface.withOpacity(0.6),
+      ),
     );
   }
 }

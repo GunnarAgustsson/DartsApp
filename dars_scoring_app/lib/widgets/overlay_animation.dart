@@ -1,45 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
+import 'package:dars_scoring_app/theme/index.dart';
 
+/// Defines different size variants for the overlay
+enum OverlaySize { small, medium, large }
+
+/// A widget that shows animated overlays for bust and turn changes
 class OverlayAnimation extends StatelessWidget {
+  /// Whether to show the bust overlay
   final bool showBust;
+  
+  /// Whether to show the turn change overlay
   final bool showTurnChange;
-  final Color bgColor;
+  
+  /// Background color for the overlay
+  final Color? bgColor;
+  
+  /// Points scored in the last turn
   final String lastTurnPoints;
+  
+  /// Labels for darts thrown in the last turn
   final String lastTurnLabels;
+  
+  /// Name of the next player
   final String nextPlayerName;
-  final double bustFontSize;
-  final double turnNameFontSize;
-  final double turnTextFontSize;
+
+  /// Size variant for the overlay
+  final OverlaySize size;
 
   const OverlayAnimation({
     super.key,
     required this.showBust,
     required this.showTurnChange,
-    required this.bgColor,
+    this.bgColor,
     required this.lastTurnPoints,
     required this.lastTurnLabels,
     required this.nextPlayerName,
-    required this.bustFontSize,
-    required this.turnNameFontSize,
-    required this.turnTextFontSize,
-  });
-
-  @override
+    this.size = OverlaySize.large,
+  });  @override
   Widget build(BuildContext context) {
+    // Calculate font sizes based on size variant
+    double bustFontSize = 72;
+    double turnNameFontSize = 36;
+    double turnTextFontSize = 28;
+    
+    switch (size) {
+      case OverlaySize.small:
+        bustFontSize = 48;
+        turnNameFontSize = 24;
+        turnTextFontSize = 18;
+        break;
+      case OverlaySize.medium:
+        bustFontSize = 64;
+        turnNameFontSize = 32;
+        turnTextFontSize = 24;
+        break;
+      case OverlaySize.large:
+        bustFontSize = 72;
+        turnNameFontSize = 36;
+        turnTextFontSize = 28;
+        break;
+    }
+    
+    // Use theme colors if bgColor not provided
+    final backgroundColor = bgColor ?? (showBust 
+        ? AppColors.bustOverlayRed 
+        : AppColors.turnChangeBlue);
+    
     return Container(
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16 * (bustFontSize / 72)),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
       ),
-      child: Center(
-        child: showBust
+      padding: const EdgeInsets.all(AppDimensions.paddingL),
+      child: Center(      child: showBust
             ? Text('BUST',
-                style: TextStyle(
+                style: AppTextStyles.bustOverlay().copyWith(
                   fontSize: bustFontSize,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 4,
                 ))
             : showTurnChange
                 ? Column(
@@ -47,27 +91,25 @@ class OverlayAnimation extends StatelessWidget {
                     children: [
                       Text(
                         'Scored: $lastTurnPoints',
-                        style: TextStyle(
+                        style: AppTextStyles.turnChangeOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(
                         lastTurnLabels,
-                        style: TextStyle(
+                        style: AppTextStyles.turnChangeOverlay().copyWith(
                           fontSize: turnTextFontSize,
-                          color: Colors.white,
+                          fontWeight: FontWeight.normal,
                         ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(
                         "$nextPlayerName's turn!",
-                        style: TextStyle(
+                        style: AppTextStyles.turnChangeOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -108,16 +150,13 @@ class OverlayWidget extends StatelessWidget {
               animation: Listenable.merge([bustController, turnController]),
               builder: (_, __) => OverlayAnimation(
                 showBust: ctrl.showBust,
-                showTurnChange: ctrl.showTurnChange,
-                bgColor: ctrl.showBust
+                showTurnChange: ctrl.showTurnChange,                bgColor: ctrl.showBust
                     ? bustColorAnim.value!
                     : turnColorAnim.value!,
                 lastTurnPoints: ctrl.lastTurnPoints(),
                 lastTurnLabels: ctrl.lastTurnLabels(),
                 nextPlayerName: nextName,
-                bustFontSize: 72,
-                turnNameFontSize: 40,
-                turnTextFontSize: 20,
+                size: OverlaySize.large,
               ),
             ),
           ),

@@ -12,10 +12,9 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION: TraditionalGameController
 // Encapsulates all scoring rules, state management, and history persistence.
-class TraditionalGameController extends ChangeNotifier {
-  // Constants for timing
+class TraditionalGameController extends ChangeNotifier {  // Constants for timing
   static const Duration _bustDisplayDuration = Duration(seconds: 2);
-  static const Duration _turnChangeDuration = Duration(seconds: 1);
+  static const Duration _turnChangeDuration = Duration(seconds: 2); // Increased to 2 seconds
   static const Duration _saveDebounceDuration = Duration(milliseconds: 500);
 
   // — Public configuration/state —
@@ -69,12 +68,12 @@ class TraditionalGameController extends ChangeNotifier {
 
   /// Return the score for a given player name
   int scoreFor(String player) => scores[players.indexOf(player)];
-
   /// Constructor: initializes state, resumes history if provided.
   TraditionalGameController({
     required this.startingScore,
     required this.players,
     GameHistory? resumeGame,
+    CheckoutRule? checkoutRule,
   })  : currentGame = resumeGame ?? 
             GameHistory(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -85,15 +84,17 @@ class TraditionalGameController extends ChangeNotifier {
               completedAt: null,
               gameMode: startingScore,
             ),
-        checkoutRule = CheckoutRule.openFinish {
+        checkoutRule = checkoutRule ?? CheckoutRule.doubleOut {
     // Initialize scores list
     scores = List<int>.filled(players.length, startingScore);
 
     // If resuming, load prior throws & scores
     if (resumeGame != null) _loadFromHistory(resumeGame);
 
-    // Async load of user‐preferred finish rule
-    _initCheckoutRule();
+    // Load user-preferred finish rule only if not explicitly provided
+    if (checkoutRule == null) {
+      _initCheckoutRule();
+    }
 
     // Configure audio player
     _audio.setReleaseMode(ReleaseMode.stop);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:dars_scoring_app/theme/app_colors.dart';
 
 class SpiderWebPainter extends CustomPainter {
   final Map<int, int> hitMap;
@@ -16,27 +17,31 @@ class SpiderWebPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 20;
     
-    final Paint webPaint = Paint()
+  final Paint webPaint = Paint()
       ..color = brightness == Brightness.dark ? Colors.white30 : Colors.black12
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
       
     final Paint hitPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.5)
+      ..color = brightness == Brightness.dark 
+          ? AppColors.primaryGreen.shade700.withOpacity(0.5) 
+          : AppColors.primaryGreen.withOpacity(0.5)
       ..style = PaintingStyle.fill;
       
     final Paint numberCirclePaint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = brightness == Brightness.dark 
+          ? AppColors.darkCardBackground.withOpacity(0.5) 
+          : AppColors.lightCardBackground.withOpacity(0.7)
       ..style = PaintingStyle.fill;
       
-    final TextStyle numberStyle = TextStyle(
+  final TextStyle numberStyle = TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.bold,
-      color: brightness == Brightness.dark ? Colors.white : Colors.black,
+      color: brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
     );
     
     // Draw concentric circles
-    final int rings = 5;
+    const int rings = 5;
     for (int i = 1; i <= rings; i++) {
       final double ringRadius = radius * i / rings;
       canvas.drawCircle(center, ringRadius, webPaint);
@@ -102,9 +107,8 @@ class SpiderWebPainter extends CustomPainter {
       final hitCount = hitMap[number] ?? 0;
       final TextSpan span = TextSpan(
         text: number.toString(),
-        style: numberStyle.copyWith(
-          color: hitCount > 0 ? 
-            Color.lerp(Colors.blue, Colors.red, hitCount / (maxHits > 0 ? maxHits : 1)) : 
+        style: numberStyle.copyWith(          color: hitCount > 0 ? 
+            Color.lerp(AppColors.primaryGreen, AppColors.secondaryRed, hitCount / (maxHits > 0 ? maxHits : 1)) : 
             numberStyle.color,
           fontWeight: hitCount > 0 ? FontWeight.bold : FontWeight.normal,
         ),
@@ -125,10 +129,9 @@ class SpiderWebPainter extends CustomPainter {
     if (bullCount > 0) {
       final double bullPercentage = maxHits > 0 ? bullCount / maxHits : 0;
       canvas.drawCircle(
-        center, 
-        10, 
+        center,        10, 
         Paint()
-          ..color = Color.lerp(Colors.blue, Colors.red, bullPercentage) ?? Colors.blue
+          ..color = Color.lerp(AppColors.primaryGreen, AppColors.secondaryRed, bullPercentage) ?? AppColors.primaryGreen
           ..style = PaintingStyle.fill
       );
       
@@ -156,16 +159,10 @@ class SpiderWebPainter extends CustomPainter {
     // Draw legend
     _drawLegend(canvas, size, rings);
   }
-  
-  void _drawLegend(Canvas canvas, Size size, int rings) {
-    final Paint legendPaint = Paint()
-      ..color = brightness == Brightness.dark ? Colors.white70 : Colors.black54
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-      
+    void _drawLegend(Canvas canvas, Size size, int rings) {
     final TextStyle legendStyle = TextStyle(
       fontSize: 10,
-      color: brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+      color: brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
     );
     
     // Draw percentage indicators

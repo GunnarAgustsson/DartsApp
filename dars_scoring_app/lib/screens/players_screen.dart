@@ -6,6 +6,7 @@ import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:convert'; 
+import 'package:dars_scoring_app/theme/app_dimensions.dart';
 
 class PlayersScreen extends StatefulWidget {
   const PlayersScreen({super.key});
@@ -43,9 +44,14 @@ class _PlayersScreenState extends State<PlayersScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final theme = Theme.of(context);
+        
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
-            title: const Text('Create New Player'),
+            title: Text(
+              'Create New Player',
+              style: theme.textTheme.titleLarge,
+            ),
             content: TextField(
               controller: controller,
               autofocus: true,
@@ -62,7 +68,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('Cancel', style: theme.textTheme.labelMedium),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -82,7 +88,7 @@ class _PlayersScreenState extends State<PlayersScreen> {
                     }
                   }
                 },
-                child: const Text('Save'),
+                child: Text('Save', style: theme.textTheme.labelMedium?.copyWith(color: Colors.white)),
               ),
             ],
           ),
@@ -105,14 +111,17 @@ class _PlayersScreenState extends State<PlayersScreen> {
 
     if (completedGames.isEmpty || playersList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No completed games or players to export.')),
+        SnackBar(
+          content: const Text('No completed games or players to export.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
       return;
     }
 
     // 3. Create an Excel workbook and sheet
     final excel = Excel.createExcel();
-    final String sheetName = 'Player History';
+    const String sheetName = 'Player History';
     final Sheet sheet = excel[sheetName];
 
     // 4. Append header row
@@ -150,7 +159,10 @@ class _PlayersScreenState extends State<PlayersScreen> {
     final List<int>? bytes = excel.encode();
     if (bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate Excel file.')),
+        SnackBar(
+          content: const Text('Failed to generate Excel file.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
       return;
     }
@@ -169,28 +181,238 @@ class _PlayersScreenState extends State<PlayersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.shortestSide >= 600;
+    final isLandscape = size.width > size.height;
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Players'),
+        title: Text(
+          'Players',
+          style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.file_download),
+            icon: Icon(
+              Icons.file_download,
+              color: theme.colorScheme.onPrimary,
+            ),
             tooltip: 'Export All Players History',
             onPressed: _exportPlayersHistoryToExcel,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: players.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(players[index]),
-                  leading: const Icon(Icons.person),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+            vertical: AppDimensions.paddingM,
+          ),
+          child: Column(
+            children: [
+              // Empty state message when no players exist
+              if (players.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: isTablet ? 80 : 64,
+                          color: theme.colorScheme.primary.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: AppDimensions.marginM),
+                        Text(
+                          'No Players Yet',
+                          style: isTablet
+                              ? theme.textTheme.headlineMedium
+                              : theme.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: AppDimensions.marginS),
+                        Text(
+                          'Add players to start tracking scores',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+              // Players list
+              if (players.isNotEmpty)
+                Expanded(
+                  child: isLandscape && isTablet
+                      ? _buildGridView(theme, isTablet)
+                      : _buildListView(theme, isTablet),
+                ),
+                
+              // Add player button
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: isTablet ? AppDimensions.paddingM : AppDimensions.paddingS,
+                  horizontal: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: isTablet ? 60.0 : 48.0,
+                  child: ElevatedButton.icon(
+                    onPressed: _showAddPlayerDialog,
+                    icon: const Icon(Icons.add),
+                    label: Text(
+                      'Create New Player',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildListView(ThemeData theme, bool isTablet) {
+    return ListView.builder(      itemCount: players.length,
+      itemBuilder: (context, index) {
+        return Card(
+          elevation: AppDimensions.elevationS,
+          margin: const EdgeInsets.symmetric(
+            vertical: AppDimensions.marginXS,
+            horizontal: AppDimensions.marginXS,
+          ),
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: AppDimensions.paddingM,
+              vertical: isTablet ? AppDimensions.paddingS : 0,
+            ),
+            title: Text(
+              players[index],
+              style: isTablet
+                  ? theme.textTheme.titleMedium
+                  : theme.textTheme.titleSmall,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primary,
+              child: Text(
+                players[index].isNotEmpty ? players[index][0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            trailing: IconButton(
+              icon: Icon(
+                Icons.delete, 
+                color: theme.colorScheme.error,
+                size: isTablet ? 28 : 24,
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(
+                      'Delete Player',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    content: Text(
+                      'Are you sure you want to delete "${players[index]}"?',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('No', style: theme.textTheme.labelMedium),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.error,
+                          foregroundColor: theme.colorScheme.onError,
+                        ),
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          setState(() {
+                            players.removeAt(index);
+                          });
+                          await _savePlayers();
+                        },
+                        child: Text('Yes', style: theme.textTheme.labelMedium),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PlayerInfoScreen(playerName: players[index]),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildGridView(ThemeData theme, bool isTablet) {
+    return GridView.builder(      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 2.5,
+        crossAxisSpacing: AppDimensions.marginM,
+        mainAxisSpacing: AppDimensions.marginM,
+      ),      itemCount: players.length,
+      padding: const EdgeInsets.all(AppDimensions.paddingM),
+      itemBuilder: (context, index) {
+        return Card(
+          elevation: AppDimensions.elevationS,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PlayerInfoScreen(playerName: players[index]),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.paddingS),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary,
+                    child: Text(
+                      players[index].isNotEmpty ? players[index][0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),                  ),
+                  const SizedBox(width: AppDimensions.marginS),
+                  Expanded(
+                    child: Text(
+                      players[index],
+                      style: theme.textTheme.titleSmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete,
+                      color: theme.colorScheme.error,
+                      size: 20,
+                    ),
                     onPressed: () {
                       showDialog(
                         context: context,
@@ -204,8 +426,8 @@ class _PlayersScreenState extends State<PlayersScreen> {
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
+                                backgroundColor: theme.colorScheme.error,
+                                foregroundColor: theme.colorScheme.onError,
                               ),
                               onPressed: () async {
                                 Navigator.of(context).pop();
@@ -220,32 +442,16 @@ class _PlayersScreenState extends State<PlayersScreen> {
                         ),
                       );
                     },
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PlayerInfoScreen(playerName: players[index]),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showAddPlayerDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Create New Player'),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

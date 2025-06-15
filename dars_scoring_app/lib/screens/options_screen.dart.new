@@ -1,0 +1,334 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/index.dart';
+
+// Checkout rule enum
+enum CheckoutRule { 
+  doubleOut,    // Standard Double‐Out
+  extendedOut,  // Extended Out
+  exactOut,     // Exact 0 Only
+  openFinish    // Open Finish
+}
+
+class OptionsScreen extends StatefulWidget {
+  const OptionsScreen({super.key});
+
+  @override
+  State<OptionsScreen> createState() => _OptionsScreenState();
+}
+
+class _OptionsScreenState extends State<OptionsScreen> {
+  late CheckoutRule _checkoutRule;
+  late bool _soundEnabled;
+  late bool _hapticFeedback;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Load all settings
+    _loadSettings();
+  }
+  
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _checkoutRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? 0];
+      _soundEnabled = prefs.getBool('soundEnabled') ?? true;
+      _hapticFeedback = prefs.getBool('hapticFeedback') ?? true;
+    });
+  }
+  
+  Future<void> _toggleDarkMode(bool value) async {
+    // Get theme provider
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    themeProvider.setTheme(value);
+  }
+
+  Future<void> _updateCheckoutRule(CheckoutRule? value) async {
+    if (value == null) return;
+    setState(() => _checkoutRule = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('checkoutRule', value.index);
+  }
+  
+  /// Builds a section header with consistent styling
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    
+    return Padding(
+      padding: EdgeInsets.only(
+        left: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+        right: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+        top: AppDimensions.paddingL,
+        bottom: AppDimensions.paddingS,
+      ),
+      child: Text(
+        title,
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isTablet = MediaQuery.of(context).size.width > 600;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Options'),
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              children: [
+                // Theme settings section
+                _buildSectionHeader(context, 'Theme Settings'),
+                
+                SwitchListTile(
+                  title: Text('Dark Mode', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Enable dark theme for low-light environments',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    Provider.of<ThemeProvider>(context).isDarkMode ? 
+                      Icons.dark_mode : Icons.light_mode,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: Provider.of<ThemeProvider>(context).isDarkMode,
+                  onChanged: _toggleDarkMode,
+                ),
+                
+                const Divider(indent: 16, endIndent: 16),
+                
+                // Game settings section
+                _buildSectionHeader(context, 'Game Settings'),
+                
+                // Checkout Rule subsection
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+                    vertical: AppDimensions.paddingS,
+                  ),
+                  child: Text(
+                    'Checkout Rule',
+                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+                  ),
+                ),
+                
+                Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.marginM,
+                    vertical: AppDimensions.marginXS,
+                  ),
+                  child: RadioListTile<CheckoutRule>(
+                    title: Text('Standard Double‐Out', style: theme.textTheme.titleSmall),
+                    subtitle: Text(
+                      'Must finish on a double or bull.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    value: CheckoutRule.doubleOut,
+                    groupValue: _checkoutRule,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: _updateCheckoutRule,
+                  ),
+                ),
+                
+                Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.marginM,
+                    vertical: AppDimensions.marginXS,
+                  ),
+                  child: RadioListTile<CheckoutRule>(
+                    title: Text('Extended Out', style: theme.textTheme.titleSmall),
+                    subtitle: Text(
+                      'Allow finish on double, triple, inner/outer bull.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    value: CheckoutRule.extendedOut,
+                    groupValue: _checkoutRule,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: _updateCheckoutRule,
+                  ),
+                ),
+                
+                Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.marginM,
+                    vertical: AppDimensions.marginXS,
+                  ),
+                  child: RadioListTile<CheckoutRule>(
+                    title: Text('Exact 0 Only', style: theme.textTheme.titleSmall),
+                    subtitle: Text(
+                      'Any segment, but must land exactly on 0.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    value: CheckoutRule.exactOut,
+                    groupValue: _checkoutRule,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: _updateCheckoutRule,
+                  ),
+                ),
+                
+                Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.marginM,
+                    vertical: AppDimensions.marginXS,
+                  ),
+                  child: RadioListTile<CheckoutRule>(
+                    title: Text('Open Finish', style: theme.textTheme.titleSmall),
+                    subtitle: Text(
+                      'First to 0 or below wins—no bust required.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    value: CheckoutRule.openFinish,
+                    activeColor: theme.colorScheme.primary,
+                    groupValue: _checkoutRule,
+                    onChanged: _updateCheckoutRule,
+                  ),
+                ),
+                
+                const Divider(indent: 16, endIndent: 16),
+                
+                // Sound & Haptics section (placeholder for now)
+                _buildSectionHeader(context, 'Sound & Haptics'),
+                
+                SwitchListTile(
+                  title: Text('Sound Effects', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Play sound effects during the game',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    _soundEnabled ? Icons.volume_up : Icons.volume_off,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: _soundEnabled,
+                  onChanged: (value) {
+                    setState(() => _soundEnabled = value);
+                    SharedPreferences.getInstance().then(
+                      (prefs) => prefs.setBool('soundEnabled', value)
+                    );
+                  },
+                ),
+                
+                SwitchListTile(
+                  title: Text('Haptic Feedback', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Use vibration for button presses',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    _hapticFeedback ? Icons.vibration : Icons.do_not_disturb_alt,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: _hapticFeedback,
+                  onChanged: (value) {
+                    setState(() => _hapticFeedback = value);
+                    SharedPreferences.getInstance().then(
+                      (prefs) => prefs.setBool('hapticFeedback', value)
+                    );
+                  },
+                ),
+                
+                const SizedBox(height: AppDimensions.marginL),
+                _buildSectionHeader(context, 'Advanced'),
+              ],
+            ),
+          ),
+          
+          // Danger zone section at bottom
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppDimensions.paddingL,
+              horizontal: AppDimensions.paddingM,
+            ),
+            child: Card(
+              color: theme.brightness == Brightness.dark 
+                  ? AppColors.error.withOpacity(0.1) 
+                  : AppColors.error.withOpacity(0.05),
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.warning_rounded,
+                      color: AppColors.error,
+                      size: 32,
+                    ),
+                    const SizedBox(height: AppDimensions.marginS),
+                    Text(
+                      'Danger Zone',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimensions.marginM),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Confirm Erase'),
+                            content: const Text('Are you sure you want to erase all app data? This cannot be undone.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.error,
+                                ),
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('Erase', style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.clear();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('All data erased'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.delete_forever),
+                          const SizedBox(width: AppDimensions.marginS),
+                          const Text('Erase All Data'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
