@@ -192,22 +192,27 @@ class AppTheme {
   static ColorScheme _getDarkColorScheme() {
     return ColorScheme(
       brightness: Brightness.dark,
-      primary: AppColors.primaryGreen.shade300,
-      onPrimary: AppColors.primaryGreen.shade900,
-      primaryContainer: AppColors.primaryGreen.shade800,
+      // Use the same main colors as the light theme for consistency
+      primary: AppColors.primaryGreen,
+      onPrimary: Colors.white,
+      secondary: AppColors.secondaryRed,
+      onSecondary: Colors.white,
+      tertiary: Colors.amber,
+      onTertiary: Colors.black,
+      error: AppColors.error,
+      onError: Colors.white,
+
+      // Dark theme specific container colors
+      primaryContainer: AppColors.primaryGreen.shade700,
       onPrimaryContainer: AppColors.primaryGreen.shade100,
-      secondary: AppColors.secondaryRed.shade300,
-      onSecondary: AppColors.secondaryRed.shade900,
-      secondaryContainer: AppColors.secondaryRed.shade800,
+      secondaryContainer: AppColors.secondaryRed.shade700,
       onSecondaryContainer: AppColors.secondaryRed.shade100,
-      tertiary: Colors.amber.shade300,
-      onTertiary: Colors.amber.shade900,
-      tertiaryContainer: Colors.amber.shade800,
+      tertiaryContainer: Colors.amber.shade700,
       onTertiaryContainer: Colors.amber.shade100,
-      error: const Color(0xFFFFB4AB),
-      onError: const Color(0xFF690005),
       errorContainer: const Color(0xFF93000A),
       onErrorContainer: const Color(0xFFFFDAD6),
+
+      // Dark theme surface and background colors
       surface: AppColors.darkSurface,
       onSurface: AppColors.darkTextPrimary,
       surfaceContainerHighest: Colors.grey.shade800,
@@ -216,7 +221,7 @@ class AppTheme {
       shadow: Colors.black.withOpacity(0.3),
       inverseSurface: Colors.grey.shade200,
       onInverseSurface: Colors.grey.shade900,
-      inversePrimary: AppColors.primaryGreen,
+      inversePrimary: AppColors.primaryGreen.shade200,
     );
   }
   

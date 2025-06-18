@@ -333,43 +333,26 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         
         if (resultingScore == 0) {
           print("FOUND A CHECKOUT!");
-          // Record checkout route (last 1-3 darts)
-          final checkoutSequence = <String>[];
-          int i = throws.length - 1;
-          
-          // Start with the final dart and go backwards to get the checkout sequence
-          int remainingScore = 0;
-          int j = i;
-          while (j >= 0 && checkoutSequence.length < 3) {
-            final ct = throws[j];
-            final v = ct['value'] as int? ?? 0;
-            final m = ct['multiplier'] as int? ?? 1;
-            remainingScore += v * m;
-            
-            if (remainingScore > 170) break; // Too high to be part of checkout
-            
-            String code;
-            if (v == 50) {
-              code = 'DB';
-            } else if (v == 25 && m == 1) code = 'SB';
-            else if (m == 3) code = 'T$v';
-            else if (m == 2) code = 'D$v';
-            else code = 'S$v';
-            
-            checkoutSequence.insert(0, code);
-            
-            // For debugging
-            print("Added $code to checkout sequence - remaining score was $remainingScore");
-            
-            j--;
+          // Record checkout route (ONLY the last dart)
+          final v = lastThrow['value'] as int? ?? 0;
+          final m = lastThrow['multiplier'] as int? ?? 1;
+          String route; // This will be the single segment code of the last dart
+
+          if (v == 50) {
+            route = 'DB';
+          } else if (v == 25 && m == 1) { // Ensure SB is m == 1
+            route = 'SB';
+          } else if (m == 3) {
+            route = 'T$v';
+          } else if (m == 2) {
+            route = 'D$v';
+          } else {
+            route = 'S$v'; // Single (non-bull)
           }
           
-          // Only record if we found a valid checkout sequence
-          if (checkoutSequence.isNotEmpty) {
-            final route = checkoutSequence.join('-');
-            print("Recording checkout route: $route");
-            checkoutRoutes[route] = (checkoutRoutes[route] ?? 0) + 1;
-          }
+          // For debugging
+          print("Recording checkout route (single dart): $route");
+          checkoutRoutes[route] = (checkoutRoutes[route] ?? 0) + 1;
         }
       }
       
@@ -966,159 +949,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildAdvancedStatsCards() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8, bottom: 8),
-          child: Text(
-            'Advanced Statistics',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildAdvancedStatRow(
-                  'Favorite Checkout',
-                  _favoriteCheckout.isEmpty 
-                      ? 'None yet' 
-                      : '$_favoriteCheckout ($_favoriteCheckoutCount times)',
-                  Icons.star,
-                  Colors.amber,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Best Day',
-                  _bestDayToPlay,
-                  Icons.calendar_today,
-                  Colors.teal,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Most Hit Number',
-                  '$mostHitNumber ($mostHitCount times)',
-                  Icons.adjust,
-                  Colors.red,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Improvement Trend',
-                  _improvementRate > 0 
-                      ? '+${_improvementRate.toStringAsFixed(1)}% per game' 
-                      : '${_improvementRate.toStringAsFixed(1)}% per game',
-                  Icons.trending_up,
-                  _improvementRate >= 0 ? Colors.green : Colors.red,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Segment Distribution',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 180,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: PieChart(PieChartData(
-                          sections: [
-                            PieChartSectionData(
-                              value: _countSingles.toDouble(),
-                              color: Colors.blue,
-                              title: 'Singles',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countDoubles.toDouble(),
-                              color: Colors.green,
-                              title: 'Doubles',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countTriples.toDouble(),
-                              color: Colors.red,
-                              title: 'Triples',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countBulls.toDouble(),
-                              color: Colors.orange,
-                              title: 'Bulls',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                          ],
-                          centerSpaceRadius: 0,
-                          sectionsSpace: 2,
-                        )),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLegendItem('Singles', Colors.blue, _countSingles),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Doubles', Colors.green, _countDoubles),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Triples', Colors.red, _countTriples),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Bulls', Colors.orange, _countBulls),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  
 
   Widget _buildLegendItem(String label, Color color, int count) {
     final total = _countSingles + _countDoubles + _countTriples + _countBulls;
@@ -1137,39 +968,6 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
           style: const TextStyle(fontSize: 12),
         ),
       ],
-    );
-  }
-
-  Widget _buildAdvancedStatRow(String label, String value, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1284,15 +1082,27 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 reservedSize: 30,
+                                interval: 1, // Suggest to the chart to consider titles at each integer interval
                                 getTitlesWidget: (value, meta) {
-                                  return SideTitleWidget(
-                                    meta: meta,
-                                    space: 8,
-                                    child: Text(
-                                      'Game ${(value + 1).toInt()}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  );
+                                  // Check if this 'value' (x-coordinate) corresponds to an actual data point
+                                  final isDataPointX = spots.any((spot) => spot.x == value);
+
+                                  if (isDataPointX) {
+                                    // Ensure the value is a valid index for the spots
+                                    // spots are 0-indexed, so game number is value + 1
+                                    if (value >= 0 && value < spots.length) {
+                                      return SideTitleWidget(
+                                        meta: meta,
+                                        space: 8,
+                                        child: Text(
+                                          '${value.toInt() + 1}', // Display 1-indexed game number
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                  // For any other case, or if value is not an x-coordinate of a spot, return an empty widget
+                                  return const SizedBox.shrink();
                                 },
                               ),
                             ),

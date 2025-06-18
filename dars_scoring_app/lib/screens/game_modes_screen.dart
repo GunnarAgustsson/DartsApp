@@ -4,63 +4,159 @@ import '../theme/index.dart';
 import '../data/possible_finishes.dart';
 import 'traditional_game_screen.dart';
 
+// Add this class definition
+class PlayerSelectionDetails {
+  final List<String> players;
+  final CheckoutRule checkoutRule;
+
+  PlayerSelectionDetails(this.players, this.checkoutRule);
+}
+
 class GameModeScreen extends StatelessWidget {
   const GameModeScreen({super.key});
+
+  String _getCheckoutRuleTitle(CheckoutRule rule) {
+    switch (rule) {
+      case CheckoutRule.doubleOut:
+        return 'Double Out';
+      case CheckoutRule.extendedOut:
+        return 'Master Out';
+      case CheckoutRule.exactOut:
+        return 'Straight Out';
+      case CheckoutRule.openFinish:
+        return 'Open Out';
+    }
+  }
+
+  String _getCheckoutRuleSubtitle(CheckoutRule rule) {
+    switch (rule) {
+      case CheckoutRule.doubleOut:
+        return 'Finish on a double (or bull)';
+      case CheckoutRule.extendedOut:
+        return 'Finish on a double or triple';
+      case CheckoutRule.exactOut:
+        return 'Any segment, exact score';
+      case CheckoutRule.openFinish:
+        return 'Any segment, can exceed score';
+    }
+  }
 
   Future<List<String>> _getPlayers() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList('players') ?? [];
   }
 
-  Future<List<String>?> _showPlayerSelectionDialog(BuildContext context) async {
+  Future<PlayerSelectionDetails?> _showPlayerSelectionDialog(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
     final players = await _getPlayers();
-    final selected = <String>[]; // use List to keep insertion order
+    final selectedPlayersList = <String>[];
 
-    return showDialog<List<String>>(
+    CheckoutRule selectedRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? CheckoutRule.doubleOut.index];
+    String selectedRuleSubtitle = _getCheckoutRuleSubtitle(selectedRule); // Helper to get subtitle
+
+    return showDialog<PlayerSelectionDetails>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: const Text('Select Players (max 8)'),
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text('Setup Game'),
             content: SizedBox(
               width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: players.length,
-                itemBuilder: (context, index) {
-                  final player = players[index];
-                  final isSelected = selected.contains(player);
-                  final order = isSelected ? selected.indexOf(player) + 1 : null;
-
-                  return ListTile(
-                    leading: isSelected
-                        ? CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Theme.of(context).colorScheme.secondary,
-                            child: Text(
-                              '$order',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select Checkout Rule:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    DropdownButtonFormField<CheckoutRule>(
+                      value: selectedRule,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 15), // Adjust vertical padding for height
+                      ),
+                      isExpanded: true,
+                      // itemHeight: null, // Remove itemHeight, let items size naturally or set to default
+                      selectedItemBuilder: (BuildContext context) { // Custom builder for selected item display
+                        return CheckoutRule.values.map<Widget>((CheckoutRule rule) {
+                          return Text(_getCheckoutRuleTitle(rule)); // Display only title
+                        }).toList();
+                      },
+                      items: CheckoutRule.values.map((CheckoutRule rule) {
+                        return DropdownMenuItem<CheckoutRule>(
+                          value: rule,
+                          child: Column( // Keep full details for dropdown items
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(_getCheckoutRuleTitle(rule), style: const TextStyle(fontSize: 16)),
+                              Text(
+                                _getCheckoutRuleSubtitle(rule),
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          )
-                        : const SizedBox(width: 24), // reserve space so things don’t shift
-                    title: Text(player),
-                    trailing: Checkbox(
-                      value: isSelected,
-                      onChanged: (checked) {
-                        setState(() {
-                          if (checked == true && selected.length < 8) {
-                            selected.add(player);
-                          } else {
-                            selected.remove(player);
-                          }
-                        });
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (CheckoutRule? newValue) {
+                        if (newValue != null) {
+                          setStateDialog(() {
+                            selectedRule = newValue;
+                            selectedRuleSubtitle = _getCheckoutRuleSubtitle(newValue); // Update subtitle
+                          });
+                        }
                       },
                     ),
-                  );
-                },
+                    Padding( // Display subtitle underneath the dropdown
+                      padding: const EdgeInsets.only(top: 4.0, left: 2.0),
+                      child: Text(
+                        selectedRuleSubtitle,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                    ),
+                    const SizedBox(height: 16), // Adjusted spacing
+                    const Text('Select Players (max 8):', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(), // To prevent nested scrolling issues
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        final isSelected = selectedPlayersList.contains(player);
+                        final order = isSelected ? selectedPlayersList.indexOf(player) + 1 : null;
+
+                        return ListTile(
+                          leading: isSelected
+                              ? CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                                  child: Text(
+                                    '$order',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox(width: 24),
+                          title: Text(player),
+                          trailing: Checkbox(
+                            value: isSelected,
+                            onChanged: (checked) {
+                              setStateDialog(() { // Use setStateDialog
+                                if (checked == true && selectedPlayersList.length < 8) {
+                                  selectedPlayersList.add(player);
+                                } else {
+                                  selectedPlayersList.remove(player);
+                                }
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -69,74 +165,10 @@ class GameModeScreen extends StatelessWidget {
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: selected.isNotEmpty
-                    ? () => Navigator.of(context).pop(selected.toList())
+                onPressed: selectedPlayersList.isNotEmpty
+                    ? () => Navigator.of(context).pop(PlayerSelectionDetails(selectedPlayersList.toList(), selectedRule))
                     : null,
                 child: const Text('Start Game'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }  Future<CheckoutRule?> _showCheckoutRuleDialog(BuildContext context) async {
-    CheckoutRule selectedRule = CheckoutRule.doubleOut; // Default
-    
-    return showDialog<CheckoutRule>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: const Text('Select Checkout Rule'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile<CheckoutRule>(
-                  title: const Text('Double Out'),
-                  subtitle: const Text('Must finish on a double (including bull)'),
-                  value: CheckoutRule.doubleOut,
-                  groupValue: selectedRule,
-                  onChanged: (value) {
-                    setState(() => selectedRule = value!);
-                  },
-                ),
-                RadioListTile<CheckoutRule>(
-                  title: const Text('Master Out'),
-                  subtitle: const Text('Must finish on a double or triple'),
-                  value: CheckoutRule.extendedOut,
-                  groupValue: selectedRule,
-                  onChanged: (value) {
-                    setState(() => selectedRule = value!);
-                  },
-                ),
-                RadioListTile<CheckoutRule>(
-                  title: const Text('Straight Out'),
-                  subtitle: const Text('Any segment, exact score'),
-                  value: CheckoutRule.exactOut,
-                  groupValue: selectedRule,
-                  onChanged: (value) {
-                    setState(() => selectedRule = value!);
-                  },
-                ),
-                RadioListTile<CheckoutRule>(
-                  title: const Text('Open Out'),
-                  subtitle: const Text('Any segment, can exceed score'),
-                  value: CheckoutRule.openFinish,
-                  groupValue: selectedRule,
-                  onChanged: (value) {
-                    setState(() => selectedRule = value!);
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(null),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(selectedRule),
-                child: const Text('Continue'),
               ),
             ],
           ),
@@ -146,23 +178,21 @@ class GameModeScreen extends StatelessWidget {
   }
 
   void _onGameModeSelected(BuildContext context, int startingScore) async {
-    // First select the checkout rule
-    final checkoutRule = await _showCheckoutRuleDialog(context);
-    if (checkoutRule == null) return; // User cancelled
-    
-    // Then select the players
-    final selectedPlayers = await _showPlayerSelectionDialog(context);
-    if (selectedPlayers != null && selectedPlayers.isNotEmpty) {
+    // Show the combined player and rule selection dialog
+    final selectionDetails = await _showPlayerSelectionDialog(context);
+
+    if (selectionDetails != null && selectionDetails.players.isNotEmpty) {
       // Save the selected checkout rule for future reference
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('checkoutRule', checkoutRule.index);
-        Navigator.push(
+      await prefs.setInt('checkoutRule', selectionDetails.checkoutRule.index);
+
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => GameScreen(
             startingScore: startingScore,
-            players: selectedPlayers,
-            checkoutRule: checkoutRule,
+            players: selectionDetails.players,
+            checkoutRule: selectionDetails.checkoutRule,
           ),
         ),
       );

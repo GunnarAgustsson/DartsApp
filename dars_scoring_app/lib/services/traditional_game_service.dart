@@ -65,9 +65,65 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     final idx = act.indexOf(curName);
     return (idx + 1) % act.length;
   }
+  /// Returns the labels of the darts thrown in the current turn.
+  List<String> get currentTurnDartLabels {
+    if (dartsThrown == 0) return [];
+
+    final playerThrows =
+        currentGame.throws.where((t) => t.player == players[currentPlayer]).toList();
+
+    if (playerThrows.length < dartsThrown) return [];
+
+    final recentThrows =
+        playerThrows.sublist(playerThrows.length - dartsThrown);
+
+    return recentThrows.map((t) {
+      if (t.value == 0) return 'M';
+      if (t.value == 50) return 'DB';
+      if (t.value == 25) return '25';
+      if (t.multiplier == 2) return 'D${t.value}';
+      if (t.multiplier == 3) return 'T${t.value}';
+      return '${t.value}';
+    }).toList();
+  }
 
   /// Return the score for a given player name
   int scoreFor(String player) => scores[players.indexOf(player)];
+
+  /// Calculate the average score for a given player in the current game.
+  double averageScoreFor(String player) {
+    final playerThrows = currentGame.throws
+        .where((t) => t.player == player && !t.wasBust) // Consider only non-bust throws
+        .toList();
+
+    if (playerThrows.isEmpty) {
+      return 0.0;
+    }
+
+    double totalScoreFromThrows = 0;
+    int validDartsCount = 0;
+
+    // Iterate through throws to sum points and count darts
+    for (var i = 0; i < playerThrows.length; i++) {
+      final throwData = playerThrows[i];
+      int pointsScoredThisDart = 0;
+
+      if (i == 0) {
+        // First throw for this player in the game
+        pointsScoredThisDart = startingScore - throwData.resultingScore;
+      } else {
+        // Subsequent throws
+        pointsScoredThisDart = playerThrows[i-1].resultingScore - throwData.resultingScore;
+      }
+      totalScoreFromThrows += pointsScoredThisDart;
+      validDartsCount++;
+    }
+    
+    // Calculate average per 3 darts
+    if (validDartsCount == 0) return 0.0;
+    return (totalScoreFromThrows / validDartsCount) * 3;
+  }
+
   /// Constructor: initializes state, resumes history if provided.
   TraditionalGameController({
     required this.startingScore,
@@ -145,7 +201,7 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     final after = before - hit;
     
     // Record the throw BEFORE checking for bust/win
-    final isWinningThrow = (after == 0);
+    // final isWinningThrow = (after == 0); // This variable was unused
     
     // Always record the throw first
     scores[currentPlayer] = after;
@@ -179,12 +235,14 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
   void _playDartSound() {
     HapticFeedback.mediumImpact();
     try {
-      _audio.stop().then((_) {
-        _audio.play(
-          AssetSource('sound/dart_throw.mp3'),
-          volume: 0.5,
-        );
-      });
+      // By simply calling play, we avoid a race condition that was present
+      // with the previous `stop().then(play)` pattern. The `play` method
+      // will automatically stop the currently playing sound before starting
+      // the new one, which is the desired behavior for rapid button presses.
+      _audio.play(
+        AssetSource('sound/dart_throw.mp3'),
+        volume: 0.5,
+      );
     } catch (e) {
       debugPrint('Audio error: $e');
     }
