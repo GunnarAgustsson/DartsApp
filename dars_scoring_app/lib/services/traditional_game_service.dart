@@ -405,13 +405,15 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     if (last.resultingScore == 0) {
       lastWinner = null;
       currentGame.completedAt = null;
-      
-      // Remove player from finished list
       _finishedPlayers.remove(last.player);
     }
 
     // 5) Decrement dartsThrown (we just "undid" one dart)
     dartsThrown = (dartsThrown - 1).clamp(0, 3);
+
+    // --- FIX: Restore multiplier to what it was for the undone throw ---
+    // If you store multiplier in DartThrow, restore it here:
+    multiplier = last.multiplier ?? 1;
 
     // 6) Persist updated history & notify UI
     currentGame

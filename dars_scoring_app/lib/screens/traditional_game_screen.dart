@@ -394,8 +394,8 @@ class _GameScreenState extends State<GameScreen>
     return LayoutBuilder(builder: (context, constraints) {
       const crossAxisCount = 5;
       const mainAxisCount = 4; // 4 rows for numbers
-      final hSpacing = AppDimensions.marginS;
-      final vSpacing = AppDimensions.marginS;
+      const hSpacing = AppDimensions.marginS;
+      const vSpacing = AppDimensions.marginS;
 
       final buttonWidth = (constraints.maxWidth - (crossAxisCount - 1) * hSpacing) / crossAxisCount;
       final buttonHeight = (constraints.maxHeight - (mainAxisCount - 1) * vSpacing) / mainAxisCount;
@@ -420,12 +420,12 @@ class _GameScreenState extends State<GameScreen>
             ),
           );
           if (col < 4) {
-            rowButtons.add(SizedBox(width: hSpacing));
+            rowButtons.add(const SizedBox(width: hSpacing));
           }
         }
         keypadRows.add(Expanded(child: Row(children: rowButtons)));
         if (row < 3) {
-          keypadRows.add(SizedBox(height: vSpacing));
+          keypadRows.add(const SizedBox(height: vSpacing));
         }
       }
 
@@ -693,7 +693,7 @@ class _GameScreenState extends State<GameScreen>
         width: isLandscape 
             ? double.infinity
             : size.width * 0.9,
-        padding: EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           vertical: AppDimensions.paddingM,
           horizontal: AppDimensions.paddingL,
         ),
