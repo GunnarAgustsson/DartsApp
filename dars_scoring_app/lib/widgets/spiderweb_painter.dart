@@ -31,11 +31,10 @@ class SpiderWebPainter extends CustomPainter {
       ..color = brightness == Brightness.dark ? Colors.white30 : Colors.black12
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
-      
-    final Paint hitPaint = Paint()
+        final Paint hitPaint = Paint()
       ..color = brightness == Brightness.dark 
-          ? AppColors.primaryGreen.shade700.withOpacity(0.5) 
-          : AppColors.primaryGreen.withOpacity(0.5)
+          ? AppColors.primaryGreen.shade600.withOpacity(0.7) 
+          : AppColors.primaryGreen.withOpacity(0.6)
       ..style = PaintingStyle.fill;
       
     final Paint numberCirclePaint = Paint()
@@ -68,19 +67,17 @@ class SpiderWebPainter extends CustomPainter {
     // Draw hit polygon
     final Path hitPath = Path();
     bool firstPoint = true;
-    
-    for (int i = 0; i < dartboardNumbers.length; i++) {
+      for (int i = 0; i < dartboardNumbers.length; i++) {
       final int number = dartboardNumbers[i];
       final int hitCount = _processedHitMap[number]!; // Use processed map
-      
-      // Calculate the percentage of max hits
-      // Ensure that even with 0 hits, the point is on the center for the line to be drawn.
+        // Calculate the percentage of max hits with a minimum radius for zero hits
       final double percentage = maxHits > 0 ? hitCount / maxHits : 0;
       final double angle = 2 * math.pi * i / dartboardNumbers.length - math.pi / 2;
-      // If hitCount is 0, hitRadius should be 0 to draw line to center.
-      // Otherwise, calculate radius based on percentage, ensuring a minimum visible line if desired,
-      // or stick to pure percentage. For now, pure percentage.
-      final double hitRadius = radius * percentage; 
+      
+      // Set minimum radius for zero hits to show a more visible circle (about 15% of the radius)
+      final double minRadius = radius * 0.15;
+      final double hitRadius = hitCount == 0 ? minRadius : math.max(minRadius, radius * percentage);
+      
       final double x = center.dx + hitRadius * math.cos(angle);
       final double y = center.dy + hitRadius * math.sin(angle);
       
@@ -95,12 +92,13 @@ class SpiderWebPainter extends CustomPainter {
     hitPath.close();
     // Fill with the existing blue color
     canvas.drawPath(hitPath, hitPaint);
-    
-    // Add this code: Draw a 1px black outline around the shape
+      // Add this code: Draw a more visible outline around the shape
     final Paint outlinePaint = Paint()
-      ..color = Colors.black
+      ..color = brightness == Brightness.dark 
+          ? Colors.white.withOpacity(0.6)
+          : Colors.black.withOpacity(0.8)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+      ..strokeWidth = 2.0;
   
     canvas.drawPath(hitPath, outlinePaint);
     
