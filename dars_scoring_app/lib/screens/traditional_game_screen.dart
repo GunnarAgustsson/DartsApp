@@ -23,6 +23,7 @@ class GameScreen extends StatefulWidget {
   final List<String> players;
   final GameHistory? gameHistory;
   final CheckoutRule? checkoutRule;
+  final bool randomOrder;
 
   const GameScreen({
     super.key,
@@ -30,6 +31,7 @@ class GameScreen extends StatefulWidget {
     required this.players,
     this.gameHistory,
     this.checkoutRule,
+    this.randomOrder = false,
   });
 
   @override
@@ -49,7 +51,6 @@ class _GameScreenState extends State<GameScreen>
 
   // (Removed - _isAnimating is no longer needed)
   bool _hasShownFinishDialog = false; // ensure we only show once
-
   @override
   void initState() {
     super.initState();
@@ -58,6 +59,7 @@ class _GameScreenState extends State<GameScreen>
       players: widget.players,
       resumeGame: widget.gameHistory,
       checkoutRule: widget.checkoutRule,
+      randomOrder: widget.randomOrder,
     )..addListener(_onStateChanged);
     
     // (Removed - animation controller setup is no longer needed)
@@ -118,16 +120,33 @@ class _GameScreenState extends State<GameScreen>
                 // allow next finish to show again
                 _hasShownFinishDialog = false;
               },
-            ),
-          TextButton(
+            ),          TextButton(
             child: Text('Play Again', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).pop();
+              
+              // Determine new player order based on randomOrder setting
+              List<String> newPlayerOrder;
+              if (widget.randomOrder) {
+                // Randomize player order for new game
+                newPlayerOrder = List.from(widget.players);
+                newPlayerOrder.shuffle();
+              } else {
+                // Shift player order: first player becomes last
+                newPlayerOrder = List.from(widget.players);
+                if (newPlayerOrder.isNotEmpty) {
+                  final firstPlayer = newPlayerOrder.removeAt(0);
+                  newPlayerOrder.add(firstPlayer);
+                }
+              }
+              
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (_) => GameScreen(
                     startingScore: widget.startingScore,
-                    players: widget.players,
+                    players: newPlayerOrder,
+                    checkoutRule: widget.checkoutRule,
+                    randomOrder: widget.randomOrder,
                   ),
                 ),
               );

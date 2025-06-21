@@ -20,6 +20,7 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
   // — Public configuration/state —
   final int startingScore;            // e.g. 301, 501
   final List<String> players;         // turn order names
+  final bool randomOrder;             // whether to randomize on play again
 
   late GameHistory currentGame;       // persistent game record
   late List<int> scores;              // current scores by player index
@@ -123,13 +124,13 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     if (validDartsCount == 0) return 0.0;
     return (totalScoreFromThrows / validDartsCount) * 3;
   }
-
   /// Constructor: initializes state, resumes history if provided.
   TraditionalGameController({
     required this.startingScore,
     required this.players,
     GameHistory? resumeGame,
     CheckoutRule? checkoutRule,
+    this.randomOrder = false,
   })  : currentGame = resumeGame ?? 
             GameHistory(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -409,11 +410,9 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     }
 
     // 5) Decrement dartsThrown (we just "undid" one dart)
-    dartsThrown = (dartsThrown - 1).clamp(0, 3);
-
-    // --- FIX: Restore multiplier to what it was for the undone throw ---
+    dartsThrown = (dartsThrown - 1).clamp(0, 3);    // --- FIX: Restore multiplier to what it was for the undone throw ---
     // If you store multiplier in DartThrow, restore it here:
-    multiplier = last.multiplier ?? 1;
+    multiplier = last.multiplier;
 
     // 6) Persist updated history & notify UI
     currentGame

@@ -8,8 +8,9 @@ import 'traditional_game_screen.dart';
 class PlayerSelectionDetails {
   final List<String> players;
   final CheckoutRule checkoutRule;
+  final bool randomOrder;
 
-  PlayerSelectionDetails(this.players, this.checkoutRule);
+  PlayerSelectionDetails(this.players, this.checkoutRule, this.randomOrder);
 }
 
 class GameModeScreen extends StatelessWidget {
@@ -45,7 +46,6 @@ class GameModeScreen extends StatelessWidget {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList('players') ?? [];
   }
-
   Future<PlayerSelectionDetails?> _showPlayerSelectionDialog(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final players = await _getPlayers();
@@ -53,6 +53,7 @@ class GameModeScreen extends StatelessWidget {
 
     CheckoutRule selectedRule = CheckoutRule.values[prefs.getInt('checkoutRule') ?? CheckoutRule.doubleOut.index];
     String selectedRuleSubtitle = _getCheckoutRuleSubtitle(selectedRule); // Helper to get subtitle
+    bool randomOrder = prefs.getBool('randomOrder') ?? false; // Get saved random order preference
 
     return showDialog<PlayerSelectionDetails>(
       context: context,
@@ -115,6 +116,27 @@ class GameModeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16), // Adjusted spacing
+                    
+                    // Random Order Checkbox
+                    CheckboxListTile(
+                      title: const Text('Random Player Order', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                        randomOrder 
+                            ? 'Players will be shuffled randomly at game start and on play again'
+                            : 'Players will follow selection order, shifting by one on play again',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      value: randomOrder,
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          randomOrder = value ?? false;
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    
                     const Text('Select Players (max 8):', style: TextStyle(fontWeight: FontWeight.bold)),
                     ListView.builder(
                       shrinkWrap: true,
@@ -166,7 +188,7 @@ class GameModeScreen extends StatelessWidget {
               ),
               ElevatedButton(
                 onPressed: selectedPlayersList.isNotEmpty
-                    ? () => Navigator.of(context).pop(PlayerSelectionDetails(selectedPlayersList.toList(), selectedRule))
+                    ? () => Navigator.of(context).pop(PlayerSelectionDetails(selectedPlayersList.toList(), selectedRule, randomOrder))
                     : null,
                 child: const Text('Start Game'),
               ),
@@ -176,23 +198,30 @@ class GameModeScreen extends StatelessWidget {
       },
     );
   }
-
   void _onGameModeSelected(BuildContext context, int startingScore) async {
     // Show the combined player and rule selection dialog
     final selectionDetails = await _showPlayerSelectionDialog(context);
 
     if (selectionDetails != null && selectionDetails.players.isNotEmpty) {
-      // Save the selected checkout rule for future reference
+      // Save the selected checkout rule and random order preference for future reference
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('checkoutRule', selectionDetails.checkoutRule.index);
+      await prefs.setBool('randomOrder', selectionDetails.randomOrder);
+
+      // Shuffle players if random order is enabled
+      List<String> finalPlayerOrder = List.from(selectionDetails.players);
+      if (selectionDetails.randomOrder) {
+        finalPlayerOrder.shuffle();
+      }
 
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => GameScreen(
             startingScore: startingScore,
-            players: selectionDetails.players,
+            players: finalPlayerOrder,
             checkoutRule: selectionDetails.checkoutRule,
+            randomOrder: selectionDetails.randomOrder,
           ),
         ),
       );
