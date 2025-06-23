@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
@@ -40,9 +41,8 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
   // New: flag + last finisher for UI
   bool showPlayerFinished = false;
   String? lastFinisher;
-
   // Internal dependencies
-  final AudioPlayer _audio = AudioPlayer();
+  AudioPlayer? _audio;
   
   // Timers for cancellable operations
   Timer? _bustTimer;
@@ -151,10 +151,16 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     // Load user-preferred finish rule only if not explicitly provided
     if (checkoutRule == null) {
       _initCheckoutRule();
+    }    // Configure audio player - only if not in test environment
+    if (!_isTestEnvironment()) {
+      try {
+        _audio = AudioPlayer();
+        _audio?.setReleaseMode(ReleaseMode.stop);
+      } catch (e) {
+        // Ignore audio errors in test environment
+        debugPrint('Audio initialization skipped: $e');
+      }
     }
-
-    // Configure audio player
-    _audio.setReleaseMode(ReleaseMode.stop);
   }
 
   /// Load the user's preferred checkout rule asynchronously
@@ -231,16 +237,23 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     _debouncedSaveHistory();
     notifyListeners();
   }
-
   /// Play the dart throw sound with error handling
   void _playDartSound() {
-    HapticFeedback.mediumImpact();
+    // Only provide haptic feedback if not in test environment
+    if (!_isTestEnvironment()) {
+      try {
+        HapticFeedback.mediumImpact();
+      } catch (e) {
+        debugPrint('Haptic feedback error: $e');
+      }
+    }
+    
     try {
       // By simply calling play, we avoid a race condition that was present
       // with the previous `stop().then(play)` pattern. The `play` method
       // will automatically stop the currently playing sound before starting
       // the new one, which is the desired behavior for rapid button presses.
-      _audio.play(
+      _audio?.play(
         AssetSource('sound/dart_throw.mp3'),
         volume: 0.5,
       );
@@ -484,11 +497,21 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     _bustTimer?.cancel();
     _turnChangeTimer?.cancel();
     _saveTimer?.cancel();
-    
-    // Dispose audio resources
-    _audio.dispose();
+      // Dispose audio resources
+    _audio?.dispose();
     
     super.dispose();
+  }
+
+  /// Check if running in test environment
+  bool _isTestEnvironment() {
+    // Simple check - try to detect if binding is null or test binding
+    try {
+      return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    } catch (e) {
+      // If we can't access WidgetsBinding, assume we're in test
+      return true;
+    }
   }
 }
 

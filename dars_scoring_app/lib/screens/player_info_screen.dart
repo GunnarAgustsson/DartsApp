@@ -56,7 +56,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadStats();
   }
 
@@ -424,21 +424,21 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     }
     
     // Improvement Rate (linear regression of game averages)
-    if (allGameAverages.length > 3) {
-      // Simple linear regression
-      final n = allGameAverages.length;
-      final indices = List.generate(n, (i) => i.toDouble());
+    if (allGameAverages.length > 3) {      // Simple linear regression
+      // final n = allGameAverages.length;
+      // final indices = List.generate(n, (i) => i.toDouble());
       
-      final sumX = indices.reduce((a, b) => a + b);
-      final sumY = allGameAverages.reduce((a, b) => a + b);
-      final sumXY = indices.asMap().entries.fold<double>(
-        0.0,
-        (double sum, MapEntry<int, double> entry) =>
-          sum + entry.value * allGameAverages[entry.key],
-      );
-      final sumX2 = indices.fold<double>(0.0, (double sum, double x) => sum + x * x);
-        // avoid division by zero
-      final denom = (n * sumX2 - sumX * sumX);
+      // Note: For trend analysis, variables would be used for slope calculation
+      // final sumX = indices.reduce((a, b) => a + b);
+      // final sumY = allGameAverages.reduce((a, b) => a + b);
+      // final sumXY = indices.asMap().entries.fold<double>(
+      //   0.0,
+      //   (double sum, MapEntry<int, double> entry) =>
+      //     sum + entry.value * allGameAverages[entry.key],
+      // );
+      // final sumX2 = indices.fold<double>(0.0, (double sum, double x) => sum + x * x);
+      // avoid division by zero
+      // final denom = (n * sumX2 - sumX * sumX);
       
       // Remove calculation as improvement rate is not displayed
     } else {
@@ -588,21 +588,21 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
           ),
         ],
         bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
+          controller: _tabController,          tabs: const [
             Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
             Tab(icon: Icon(Icons.insights), text: 'Trends'),
             Tab(icon: Icon(Icons.sports), text: 'Hitting'),
+            Tab(icon: Icon(Icons.casino), text: 'Cricket'),
             Tab(icon: Icon(Icons.history), text: 'History'),
           ],
         ),
       ),
       body: TabBarView(
-        controller: _tabController,
-        children: [
+        controller: _tabController,        children: [
           _buildOverviewTab(),
           _buildTrendsTab(),
           _buildHittingTab(),
+          _buildCricketTab(),
           _buildHistoryTab(),
         ],
       ),
@@ -1697,116 +1697,400 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildHistoryTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Recent Games',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+  Widget _buildCricketTab() {
+    // Load Cricket game stats
+    final cricketGames = lastGames.where((g) => g['gameMode'] == 'Cricket').toList();
+    
+    if (cricketGames.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.casino, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'No Cricket Games Played',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
                 ),
-                const SizedBox(height: 16),
-                ...lastGames.map((g) {
-                  final date = DateTime.tryParse(g['createdAt'] ?? '') ?? DateTime.now();
-                  final winner = g['winner'];
-                  final completed = g['completedAt'] != null;
-                  final isWin = completed && winner == widget.playerName;
-                  final isLoss = completed && winner != null && winner != widget.playerName;
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: isWin 
-                          ? Colors.green.shade50 
-                          : isLoss 
-                              ? Colors.red.shade50 
-                              : Colors.grey.shade50,
-                      border: Border.all(
-                        color: isWin 
-                            ? Colors.green.shade200 
-                            : isLoss 
-                                ? Colors.red.shade200 
-                                : Colors.grey.shade200,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Start playing Cricket to see statistics here!',
+                style: TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Calculate Cricket statistics
+    int totalCricketGames = cricketGames.length;
+    int cricketWins = cricketGames.where((g) => g['winner'] == widget.playerName).length;
+    double cricketWinRate = totalCricketGames > 0 ? (cricketWins / totalCricketGames) * 100 : 0.0;
+    
+    // Count hits on each cricket number
+    Map<int, int> cricketHits = {20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, 25: 0};
+    Map<int, int> cricketCloses = {20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, 25: 0};
+    int totalCricketScore = 0;
+    double avgCricketScore = 0.0;
+    
+    for (final game in cricketGames) {
+      final throws = (game['throws'] as List)
+          .where((t) => t['player'] == widget.playerName)
+          .toList();
+      
+      // Track hits per number
+      Map<int, int> gameHits = {20: 0, 19: 0, 18: 0, 17: 0, 16: 0, 15: 0, 25: 0};
+      int gameScore = 0;
+      
+      for (final dartThrow in throws) {
+        final value = dartThrow['value'] as int;
+        final multiplier = dartThrow['multiplier'] as int;
+        
+        if (cricketHits.containsKey(value)) {
+          cricketHits[value] = cricketHits[value]! + multiplier;
+          gameHits[value] = gameHits[value]! + multiplier;
+        }
+      }
+      
+      // Count closes (numbers with 3+ hits)
+      gameHits.forEach((number, hits) {
+        if (hits >= 3) {
+          cricketCloses[number] = cricketCloses[number]! + 1;
+        }
+      });
+      
+      // Get final score from playerStates if available
+      if (game['playerStates'] != null && game['playerStates'][widget.playerName] != null) {
+        gameScore = game['playerStates'][widget.playerName]['score'] ?? 0;
+      }
+      totalCricketScore += gameScore;
+    }
+    
+    avgCricketScore = totalCricketGames > 0 ? totalCricketScore / totalCricketGames : 0.0;
+    
+    // Find favorite number (most hits)
+    int favoriteNumber = 20;
+    int maxHits = 0;
+    cricketHits.forEach((number, hits) {
+      if (hits > maxHits) {
+        maxHits = hits;
+        favoriteNumber = number;
+      }
+    });
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cricket Overview Stats
+          _buildStatsCard(
+            title: 'Cricket Overview',
+            children: [
+              _buildStatRow('Games Played', totalCricketGames.toString()),
+              _buildStatRow('Games Won', cricketWins.toString()),
+              _buildStatRow('Win Rate', '${cricketWinRate.toStringAsFixed(1)}%'),
+              _buildStatRow('Avg Score', avgCricketScore.toStringAsFixed(1)),
+              _buildStatRow(
+                'Favorite Number', 
+                favoriteNumber == 25 ? 'Bull ($maxHits hits)' : '$favoriteNumber ($maxHits hits)'
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Cricket Numbers Performance
+          _buildStatsCard(
+            title: 'Numbers Performance',
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Expanded(flex: 2, child: Text('Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Expanded(flex: 2, child: Text('Total Hits', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                          Expanded(flex: 2, child: Text('Games Closed', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                          Expanded(flex: 2, child: Text('Close Rate', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                        ],
                       ),
                     ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isWin 
-                            ? Colors.green 
-                            : isLoss 
-                                ? Colors.red 
-                                : Colors.orange,
-                        child: Icon(
-                          isWin 
-                              ? Icons.emoji_events 
-                              : isLoss 
-                                  ? Icons.do_not_disturb 
-                                  : Icons.access_time,
-                          color: Colors.white,
-                          size: 20,
+                    // Data rows
+                    ...cricketHits.entries.map((entry) {
+                      final number = entry.key;
+                      final hits = entry.value;
+                      final closes = cricketCloses[number]!;
+                      final closeRate = totalCricketGames > 0 ? (closes / totalCricketGames) * 100 : 0.0;
+                      
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                number == 25 ? 'Bull' : number.toString(),
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                hits.toString(), 
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                '$closes/$totalCricketGames', 
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2, 
+                              child: Text(
+                                '${closeRate.toStringAsFixed(0)}%', 
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: closeRate >= 75 ? Colors.green : 
+                                         closeRate >= 50 ? Colors.orange : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Recent Cricket Games
+          _buildStatsCard(
+            title: 'Recent Cricket Games',
+            children: [
+              ...cricketGames.take(5).map((game) {
+                final date = DateTime.parse(game['createdAt']);
+                final completed = game['completedAt'] != null;
+                final isWin = game['winner'] == widget.playerName;
+                final winner = game['winner'];
+                
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    title: Text(
+                      'Cricket Game',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          !completed
+                              ? 'In Progress'
+                              : isWin
+                                  ? 'You won!'
+                                  : 'Winner: $winner',
+                          style: TextStyle(
+                            color: !completed
+                                ? Colors.orange
+                                : isWin
+                                    ? Colors.green
+                                    : Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Icon(
+                      completed 
+                          ? (isWin ? Icons.emoji_events : Icons.sports) 
+                          : Icons.play_circle_outline,
+                      color: completed 
+                          ? (isWin ? Colors.amber : Colors.grey) 
+                          : Colors.blue,
+                    ),
+                    isThreeLine: true,
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method for building stats cards
+  Widget _buildStatsCard({required String title, required List<Widget> children}) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method for building stat rows
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build history tab (simple implementation for now)
+  Widget _buildHistoryTab() {
+    final completedGames = lastGames.where((g) => g['completedAt'] != null).toList();
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Game History',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (completedGames.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'No completed games yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...completedGames.take(20).map((g) {
+              final date = DateTime.parse(g['createdAt']);
+              final completed = g['completedAt'] != null;
+              final isWin = g['winner'] == widget.playerName;
+              final winner = g['winner'];
+              final gameMode = g['gameMode'];
+              
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  title: Text(
+                    gameMode == 'Cricket' ? 'Cricket Game' : 'Game Mode: $gameMode',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
                         ),
                       ),
-                      title: Text(
-                        'Game Mode: ${g['gameMode'] ?? ''}',
-                        style: const TextStyle(
+                      const SizedBox(height: 4),
+                      Text(
+                        !completed
+                            ? 'In Progress'
+                            : isWin
+                                ? 'You won!'
+                                : 'Winner: $winner',
+                        style: TextStyle(
+                          color: !completed
+                              ? Colors.orange
+                              : isWin
+                                  ? Colors.green
+                                  : Colors.red,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            !completed
-                                ? 'In Progress'
-                                : isWin
-                                    ? 'You won!'
-                                    : 'Winner: $winner',
-                            style: TextStyle(
-                              color: !completed
-                                  ? Colors.orange
-                                  : isWin
-                                      ? Colors.green
-                                      : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.info_outline),
-                        onPressed: () => _showGameDetailsDialog(g),
-                        tooltip: 'Game Details',
-                      ),
-                      isThreeLine: true,
-                      onTap: () => _showGameDetailsDialog(g),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-      ],
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: () => _showGameDetailsDialog(g),
+                    tooltip: 'Game Details',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            }).toList(),
+        ],
+      ),
     );
   }
 }

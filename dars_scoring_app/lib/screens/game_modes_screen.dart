@@ -3,6 +3,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/index.dart';
 import '../data/possible_finishes.dart';
 import 'traditional_game_screen.dart';
+import 'cricket_game_screen.dart';
+
+// Add this class definition for Cricket
+class CricketPlayerSelectionDetails {
+  final List<String> players;
+  final bool randomOrder;
+
+  CricketPlayerSelectionDetails(this.players, this.randomOrder);
+}
 
 // Add this class definition
 class PlayerSelectionDetails {
@@ -46,6 +55,117 @@ class GameModeScreen extends StatelessWidget {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList('players') ?? [];
   }
+  Future<CricketPlayerSelectionDetails?> _showCricketPlayerSelectionDialog(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final players = await _getPlayers();
+    final selectedPlayersList = <String>[];
+
+    bool randomOrder = prefs.getBool('randomOrder') ?? false;
+
+    return showDialog<CricketPlayerSelectionDetails>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text('Setup Cricket Game'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Cricket Rules:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Close all numbers (20, 19, 18, 17, 16, 15, Bull) by hitting them 3 times. '
+                      'Score points on closed numbers until opponents close them. '
+                      'Win by closing all numbers with the highest score.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Random Order Checkbox
+                    CheckboxListTile(
+                      title: const Text('Random Player Order', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                        randomOrder 
+                            ? 'Players will be shuffled randomly at game start and on play again'
+                            : 'Players will follow selection order, shifting by one on play again',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      value: randomOrder,
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          randomOrder = value ?? false;
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    const Text('Select Players (max 8):', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        final isSelected = selectedPlayersList.contains(player);
+                        final order = isSelected ? selectedPlayersList.indexOf(player) + 1 : null;
+
+                        return ListTile(
+                          leading: isSelected
+                              ? CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                                  child: Text(
+                                    '$order',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox(width: 24),
+                          title: Text(player),
+                          trailing: Checkbox(
+                            value: isSelected,
+                            onChanged: (checked) {
+                              setStateDialog(() {
+                                if (checked == true && selectedPlayersList.length < 8) {
+                                  selectedPlayersList.add(player);
+                                } else {
+                                  selectedPlayersList.remove(player);
+                                }
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedPlayersList.isNotEmpty
+                    ? () => Navigator.of(context).pop(CricketPlayerSelectionDetails(selectedPlayersList.toList(), randomOrder))
+                    : null,
+                child: const Text('Start Cricket Game'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<PlayerSelectionDetails?> _showPlayerSelectionDialog(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final players = await _getPlayers();
@@ -197,8 +317,7 @@ class GameModeScreen extends StatelessWidget {
         );
       },
     );
-  }
-  void _onGameModeSelected(BuildContext context, int startingScore) async {
+  }  void _onGameModeSelected(BuildContext context, int startingScore) async {
     // Show the combined player and rule selection dialog
     final selectionDetails = await _showPlayerSelectionDialog(context);
 
@@ -227,12 +346,39 @@ class GameModeScreen extends StatelessWidget {
       );
     }
   }
-  /// Builds a game mode button with consistent styling
+
+  void _onCricketGameSelected(BuildContext context) async {
+    // For Cricket, we only need player selection and random order
+    final selectionDetails = await _showCricketPlayerSelectionDialog(context);
+
+    if (selectionDetails != null && selectionDetails.players.isNotEmpty) {
+      // Save random order preference for future reference
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('randomOrder', selectionDetails.randomOrder);
+
+      // Shuffle players if random order is enabled
+      List<String> finalPlayerOrder = List.from(selectionDetails.players);
+      if (selectionDetails.randomOrder) {
+        finalPlayerOrder.shuffle();
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CricketGameScreen(
+            players: finalPlayerOrder,
+            randomOrder: selectionDetails.randomOrder,
+          ),
+        ),
+      );
+    }
+  }  /// Builds a game mode button with consistent styling
   Widget _buildGameModeButton({
     required BuildContext context,
     required String label,
-    required int startingScore,
+    int? startingScore,
     bool isSecondary = false,
+    bool isCricket = false,
   }) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
@@ -248,7 +394,9 @@ class GameModeScreen extends StatelessWidget {
       ),
       elevation: AppDimensions.elevationM,
       child: InkWell(
-        onTap: () => _onGameModeSelected(context, startingScore),
+        onTap: () => isCricket 
+            ? _onCricketGameSelected(context)
+            : _onGameModeSelected(context, startingScore!),
         borderRadius: BorderRadius.circular(AppDimensions.radiusL),
         child: Container(
           width: buttonWidth,
@@ -258,9 +406,11 @@ class GameModeScreen extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDimensions.radiusL),
             gradient: LinearGradient(
-              colors: isSecondary ? 
-                [theme.colorScheme.secondary.withOpacity(0.8), theme.colorScheme.secondary] : 
-                [theme.colorScheme.primary.withOpacity(0.8), theme.colorScheme.primary],
+              colors: isCricket 
+                  ? [Colors.green.withOpacity(0.8), Colors.green] 
+                  : isSecondary ? 
+                      [theme.colorScheme.secondary.withOpacity(0.8), theme.colorScheme.secondary] : 
+                      [theme.colorScheme.primary.withOpacity(0.8), theme.colorScheme.primary],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -277,10 +427,13 @@ class GameModeScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppDimensions.marginS),
               Text(
-                'Starting Score: $startingScore',
+                isCricket 
+                    ? 'Close 20, 19, 18, 17, 16, 15, Bull'
+                    : 'Starting Score: $startingScore',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white.withOpacity(0.9),
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -311,8 +464,7 @@ class GameModeScreen extends StatelessWidget {
       ),
     );
   }
-  
-  /// Builds the portrait layout
+    /// Builds the portrait layout
   Widget _buildPortraitLayout(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
@@ -337,14 +489,17 @@ class GameModeScreen extends StatelessWidget {
               startingScore: 301,
               isSecondary: true,
             ),
-            // Could add more game modes here
+            _buildGameModeButton(
+              context: context,
+              label: 'Cricket',
+              isCricket: true,
+            ),
           ],
         ),
       ),
     );
   }
-  
-  /// Builds the landscape layout
+    /// Builds the landscape layout
   Widget _buildLandscapeLayout(BuildContext context) {
     return Center(
       child: Row(
@@ -364,6 +519,13 @@ class GameModeScreen extends StatelessWidget {
               label: '301',
               startingScore: 301,
               isSecondary: true,
+            ),
+          ),
+          Expanded(
+            child: _buildGameModeButton(
+              context: context,
+              label: 'Cricket',
+              isCricket: true,
             ),
           ),
         ],
