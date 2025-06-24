@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart'; // Add this dependency for date formatting
 import 'dart:convert';
@@ -7,6 +6,7 @@ import 'package:collection/collection.dart'; // For grouping
 import 'traditional_game_screen.dart';
 import 'cricket_game_screen.dart';
 import '../models/unified_game_history.dart';
+import '../models/app_enums.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -472,11 +472,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _resumeGame(UnifiedGameHistory game) {
     if (game.isCricket) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
+      Navigator.of(context).push(        MaterialPageRoute(
           builder: (_) => CricketGameScreen(
             players: game.players,
             gameHistory: game.cricketGame,
+            variant: CricketVariant.standard, // Default for resumed games
           ),
         ),
       );

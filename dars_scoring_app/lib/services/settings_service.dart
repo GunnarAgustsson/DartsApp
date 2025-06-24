@@ -1,4 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/app_enums.dart';
+import '../data/possible_finishes.dart';
 
 /// A service class to manage app settings and preferences
 class SettingsService {
@@ -8,6 +10,8 @@ class SettingsService {
   static const String soundEffectsKey = 'soundEffects';
   static const String animationsEnabledKey = 'animationsEnabled';
   static const String textScaleFactorKey = 'textScaleFactor';
+  static const String animationSpeedKey = 'animationSpeed';
+  static const String checkoutRuleKey = 'checkoutRule';
   
   /// Save dark mode preference
   static Future<void> saveDarkModeSetting(bool isDarkMode) async {
@@ -67,5 +71,31 @@ class SettingsService {
   static Future<double> getTextScaleFactor() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getDouble(textScaleFactorKey) ?? 1.0; // Default to normal scale
+  }
+  
+  /// Save animation speed preference
+  static Future<void> saveAnimationSpeed(AnimationSpeed speed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(animationSpeedKey, speed.index);
+  }
+  
+  /// Get animation speed preference
+  static Future<AnimationSpeed> getAnimationSpeed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final index = prefs.getInt(animationSpeedKey) ?? AnimationSpeed.normal.index;
+    return AnimationSpeed.values[index];
+  }
+  
+  /// Save checkout rule preference
+  static Future<void> saveCheckoutRule(CheckoutRule rule) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(checkoutRuleKey, rule.index);
+  }
+  
+  /// Get checkout rule preference
+  static Future<CheckoutRule> getCheckoutRule() async {
+    final prefs = await SharedPreferences.getInstance();
+    final index = prefs.getInt(checkoutRuleKey) ?? CheckoutRule.doubleOut.index;
+    return CheckoutRule.values[index];
   }
 }

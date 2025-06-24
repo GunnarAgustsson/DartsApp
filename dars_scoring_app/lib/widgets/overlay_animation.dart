@@ -28,6 +28,9 @@ class OverlayAnimation extends StatelessWidget {
   /// Size variant for the overlay
   final OverlaySize size;
 
+  /// Animation duration for this overlay
+  final Duration animationDuration;
+
   const OverlayAnimation({
     super.key,
     required this.showBust,
@@ -37,7 +40,8 @@ class OverlayAnimation extends StatelessWidget {
     required this.lastTurnLabels,
     required this.nextPlayerName,
     this.size = OverlaySize.large,
-  });  @override
+    this.animationDuration = const Duration(milliseconds: 300),
+  });@override
   Widget build(BuildContext context) {
     // Calculate font sizes based on size variant
     double bustFontSize = 72;

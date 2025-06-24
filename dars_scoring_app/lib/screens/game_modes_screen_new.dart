@@ -412,7 +412,8 @@ class GameModeScreen extends StatelessWidget {
 
       List<String> finalPlayerOrder = List.from(selectionDetails.players);
       if (selectionDetails.randomOrder) {
-        finalPlayerOrder.shuffle();      }      Navigator.push(
+        finalPlayerOrder.shuffle();
+      }      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => CricketGameScreen(

@@ -616,7 +616,7 @@ class _GameScreenState extends State<GameScreen>
                       foregroundColor: theme.colorScheme.error,
                       side: BorderSide(color: theme.colorScheme.error, width: 2),
                       shape: const StadiumBorder(),
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 4.0,
                         vertical: 2.0,
                       ),
@@ -631,7 +631,7 @@ class _GameScreenState extends State<GameScreen>
                             Icons.cancel_outlined, 
                             size: iconSize,
                           ),
-                          SizedBox(height: 1),
+                          const SizedBox(height: 1),
                           Text(
                             'Miss',
                             style: TextStyle(
@@ -684,7 +684,7 @@ class _GameScreenState extends State<GameScreen>
                       foregroundColor: theme.colorScheme.error,
                       side: BorderSide(color: theme.colorScheme.error, width: 2),
                       shape: const StadiumBorder(),
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 4.0,
                         vertical: 2.0,
                       ),
@@ -699,7 +699,7 @@ class _GameScreenState extends State<GameScreen>
                             Icons.undo, 
                             size: iconSize,
                           ),
-                          SizedBox(height: 1),
+                          const SizedBox(height: 1),
                           Text(
                             'Undo',
                             style: TextStyle(
@@ -743,7 +743,6 @@ class _GameScreenState extends State<GameScreen>
       ],
     );
   }
-
   /// Build overlay for animations (bust or turn change)
   Widget _buildOverlayAnimation(
     bool showBust, 
@@ -754,13 +753,14 @@ class _GameScreenState extends State<GameScreen>
       visible: showBust || showTurnChange,
       child: AnimatedOpacity(
         opacity: showBust || showTurnChange ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
+        duration: _ctrl.overlayAnimationDuration,
         child: OverlayAnimation(
           showBust: showBust,
           showTurnChange: showTurnChange,
           lastTurnPoints: _ctrl.lastTurnPoints(),
           lastTurnLabels: _ctrl.lastTurnLabels(),
           nextPlayerName: nextPlayerName ?? '',
+          animationDuration: _ctrl.overlayAnimationDuration,
         ),
       ),
     );

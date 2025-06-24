@@ -2,20 +2,21 @@
 // SECTION: Imports
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
+import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION: TraditionalGameController
 // Encapsulates all scoring rules, state management, and history persistence.
-class TraditionalGameController extends ChangeNotifier {  // Constants for timing
-  static const Duration _bustDisplayDuration = Duration(seconds: 2);
-  static const Duration _turnChangeDuration = Duration(seconds: 2); // Increased to 2 seconds
+class TraditionalGameController extends ChangeNotifier {
+  // Default animation durations - will be replaced by user settings
+  Duration _bustDisplayDuration = const Duration(seconds: 2);
+  Duration _turnChangeDuration = const Duration(seconds: 2);
   static const Duration _saveDebounceDuration = Duration(milliseconds: 500);
 
   // — Public configuration/state —
@@ -56,7 +57,6 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
   /// Public getter: index in [activePlayers] of the current turn
   int get activeCurrentIndex =>
     activePlayers.indexOf(players[currentPlayer]);
-
   /// Public getter: index in [activePlayers] of next turn
   int get activeNextIndex {
     final act = activePlayers;
@@ -66,6 +66,14 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     final idx = act.indexOf(curName);
     return (idx + 1) % act.length;
   }
+
+  /// Public getter: animation duration for UI overlays
+  Duration get overlayAnimationDuration {
+    // Use a shorter duration based on the bust/turn change duration
+    final baseDuration = _bustDisplayDuration.inMilliseconds;
+    return Duration(milliseconds: (baseDuration * 0.15).round().clamp(200, 800));
+  }
+
   /// Returns the labels of the darts thrown in the current turn.
   List<String> get currentTurnDartLabels {
     if (dartsThrown == 0) return [];
@@ -123,8 +131,7 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     // Calculate average per 3 darts
     if (validDartsCount == 0) return 0.0;
     return (totalScoreFromThrows / validDartsCount) * 3;
-  }
-  /// Constructor: initializes state, resumes history if provided.
+  }  /// Constructor: initializes state, resumes history if provided.
   TraditionalGameController({
     required this.startingScore,
     required this.players,
@@ -151,7 +158,12 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     // Load user-preferred finish rule only if not explicitly provided
     if (checkoutRule == null) {
       _initCheckoutRule();
-    }    // Configure audio player - only if not in test environment
+    }
+    
+    // Load animation speed settings
+    _loadAnimationSpeed();
+
+    // Configure audio player - only if not in test environment
     if (!_isTestEnvironment()) {
       try {
         _audio = AudioPlayer();
@@ -160,6 +172,38 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
         // Ignore audio errors in test environment
         debugPrint('Audio initialization skipped: $e');
       }
+    }
+  }
+
+  /// Load animation speed from settings
+  Future<void> _loadAnimationSpeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final speedIndex = prefs.getInt('animationSpeed') ?? AnimationSpeed.normal.index;
+      final animationSpeed = AnimationSpeed.values[speedIndex];
+      
+      // Convert to appropriate durations
+      switch (animationSpeed) {
+        case AnimationSpeed.none:
+          _bustDisplayDuration = const Duration(milliseconds: 100);
+          _turnChangeDuration = const Duration(milliseconds: 100);
+          break;
+        case AnimationSpeed.fast:
+          _bustDisplayDuration = const Duration(milliseconds: 800);
+          _turnChangeDuration = const Duration(milliseconds: 800);
+          break;
+        case AnimationSpeed.normal:
+          _bustDisplayDuration = const Duration(seconds: 2);
+          _turnChangeDuration = const Duration(seconds: 2);
+          break;
+        case AnimationSpeed.slow:
+          _bustDisplayDuration = const Duration(seconds: 3);
+          _turnChangeDuration = const Duration(seconds: 3);
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error loading animation speed: $e');
+      // Use defaults
     }
   }
 
@@ -219,10 +263,14 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
       resultingScore: after,
       timestamp: DateTime.now(),
       wasBust: false,
-    ));
-    
-    // NOW handle bust or win scenarios
-    if (_handleBustOrWin(after, value)) return;
+    ));    // NOW handle bust or win scenarios
+    if (_handleBustOrWin(after, value)) {
+      // Save the game even if handling bust or win
+      currentGame.modifiedAt = DateTime.now();
+      debugPrint('Saving game after bust/win handling');
+      await _saveHistory(); // Direct save instead of debounced
+      return;
+    }
 
     // Continue with normal flow for non-bust, non-win throws
     dartsThrown++;
@@ -272,8 +320,7 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
   bool _handleBustOrWin(int afterScore, int dartValue) {
     bool isBust = false, isWin = false;
     
-    switch (checkoutRule) {
-      case CheckoutRule.doubleOut:
+    switch (checkoutRule) {      case CheckoutRule.doubleOut:
         if (afterScore < 0 || afterScore == 1) {
           isBust = true;
         } else if (afterScore == 0 &&
@@ -312,10 +359,22 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
     }
     
     return false;
-  }
-
-  /// Handle a busted turn
+  }  /// Handle a busted turn
   void _handleBust() {
+    // Mark the last throw as a bust and update the resulting score to turn start
+    if (currentGame.throws.isNotEmpty) {
+      final lastThrow = currentGame.throws.last;
+      // Create a new bust throw to replace the last one
+      currentGame.throws[currentGame.throws.length - 1] = DartThrow(
+        player: lastThrow.player,
+        value: lastThrow.value,
+        multiplier: lastThrow.multiplier,
+        resultingScore: turnStartScore, // Reset to turn start score
+        timestamp: lastThrow.timestamp,
+        wasBust: true, // Mark as bust
+      );
+    }
+    
     // Reset to turn start score and flash bust
     scores[currentPlayer] = turnStartScore;
     dartsThrown = 0;
@@ -453,20 +512,20 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
       dartsThrown = 0;
       notifyListeners();
     });
-  }
-
-  /// Debounced history saving to reduce frequency of writes
+  }  /// Debounced history saving to reduce frequency of writes
   void _debouncedSaveHistory() {
+    debugPrint('_debouncedSaveHistory called');
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDebounceDuration, () {
+      debugPrint('Debounced save timer triggered for save');
       _saveHistory();
     });
-  }
-
-  /// Persist the game history list in SharedPreferences
+  }  /// Persist the game history list in SharedPreferences
   Future<void> _saveHistory() async {
+    debugPrint('_saveHistory method called');
     try {
       final prefs = await SharedPreferences.getInstance();
+      debugPrint('SharedPreferences instance obtained');
       // sync the live state into the history record:
       currentGame
         ..currentPlayer = currentPlayer
@@ -474,6 +533,7 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
         ..modifiedAt = DateTime.now();
 
       final games = prefs.getStringList('games_history') ?? [];
+      debugPrint('Current games count: ${games.length}');
       final json = jsonEncode(currentGame.toJson());
       // Replace or append this game's entry
       final idx = games.indexWhere((g) {
@@ -481,11 +541,14 @@ class TraditionalGameController extends ChangeNotifier {  // Constants for timin
       });
       if (idx < 0) {
         games.add(json);
+        debugPrint('Added new game, total games now: ${games.length}');
       } else {
         games[idx] = json;
+        debugPrint('Updated existing game, total games: ${games.length}');
       }
 
       await prefs.setStringList('games_history', games);
+      debugPrint('Successfully saved games to SharedPreferences');
     } catch (e) {
       debugPrint('Error saving game history: $e');
     }

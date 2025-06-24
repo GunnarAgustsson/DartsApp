@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:dars_scoring_app/models/cricket_game.dart';
+import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/services/cricket_game_service.dart';
 import 'package:dars_scoring_app/theme/app_dimensions.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
@@ -19,12 +20,14 @@ class CricketGameScreen extends StatefulWidget {
   final List<String> players;
   final CricketGameHistory? gameHistory;
   final bool randomOrder;
+  final CricketVariant variant;
 
   const CricketGameScreen({
     super.key,
     required this.players,
     this.gameHistory,
     this.randomOrder = false,
+    this.variant = CricketVariant.standard,
   });
 
   @override
@@ -42,12 +45,12 @@ class _CricketGameScreenState extends State<CricketGameScreen>
   @override
   void initState() {
     super.initState();
-    
-    // Initialize cricket game controller
+      // Initialize cricket game controller
     _ctrl = CricketGameController(
       players: widget.players,
       resumeGame: widget.gameHistory,
       randomOrder: widget.randomOrder,
+      variant: widget.variant,
     )..addListener(_onStateChanged);
   }
 
@@ -108,12 +111,12 @@ class _CricketGameScreenState extends State<CricketGameScreen>
                   newPlayerOrder.add(firstPlayer);
                 }
               }
-              
-              Navigator.of(context).pushReplacement(
+                Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (_) => CricketGameScreen(
                     players: newPlayerOrder,
                     randomOrder: widget.randomOrder,
+                    variant: widget.variant,
                   ),
                 ),
               );
@@ -353,23 +356,23 @@ class _CricketGameScreenState extends State<CricketGameScreen>
                 ),
               ),
             ),
-            
-            const SizedBox(height: AppDimensions.marginS),
+              const SizedBox(height: AppDimensions.marginS),
 
-            // Current score
-            Expanded(
-              flex: 3,
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: Text(
-                  currentPlayerState.score.toString(),
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+            // Current score (only show in standard mode)
+            if (widget.variant == CricketVariant.standard)
+              Expanded(
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Text(
+                    currentPlayerState.score.toString(),
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
-            ),
             
             const SizedBox(height: AppDimensions.marginS),
 
@@ -463,21 +466,29 @@ class _CricketGameScreenState extends State<CricketGameScreen>
       final buttonWidth = (constraints.maxWidth - (crossAxisCount - 1) * hSpacing) / crossAxisCount;
       final buttonHeight = (constraints.maxHeight - (mainAxisCount - 1) * vSpacing) / mainAxisCount;
       final side = min(buttonWidth, buttonHeight);
-      final numberButtonSize = Size(side, side);
-
-      // Cricket numbers: 20, 19, 18, 17, 16, 15, Bull
-      final numbers = [20, 19, 18, 17, 16, 15, 25];
+      final numberButtonSize = Size(side, side);      // Cricket numbers from variant
+      final numbers = _ctrl.cricketNumbersForVariant;
+      
+      // Separate regular numbers from bull (if present)
+      final regularNumbers = numbers.where((n) => n != 25).toList();
+      final hasBull = numbers.contains(25);
       
       List<Widget> rows = [];
-      for (int row = 0; row < 4; row++) {
+      
+      // Calculate how many rows we need for regular numbers (2 per row)
+      final regularRows = (regularNumbers.length / 2).ceil();
+      final totalRows = regularRows + (hasBull ? 1 : 0);
+      
+      for (int row = 0; row < totalRows; row++) {
         List<Widget> rowButtons = [];
         
-        if (row < 3) {
-          // Regular number rows (20,19 / 18,17 / 16,15)
-          final startIdx = row * 2;          for (int col = 0; col < 2; col++) {
+        if (row < regularRows) {
+          // Regular number rows
+          final startIdx = row * 2;
+          for (int col = 0; col < 2; col++) {
             final numIdx = startIdx + col;
-            if (numIdx < numbers.length - 1) { // Exclude bull for now
-              final value = numbers[numIdx];
+            if (numIdx < regularNumbers.length) {
+              final value = regularNumbers[numIdx];
               final canScore = _ctrl.canCurrentPlayerScoreOn(value);
               final currentPlayerState = _ctrl.getPlayerState(_ctrl.players[_ctrl.currentPlayer]);
               final hits = currentPlayerState.hits[value]!;
@@ -497,8 +508,7 @@ class _CricketGameScreenState extends State<CricketGameScreen>
                 if (hits == 0) return theme.colorScheme.primary;
                 return Colors.white;
               }
-              
-              rowButtons.add(
+                rowButtons.add(
                 Expanded(
                   child: ScoreButton(
                     value: value,
@@ -514,10 +524,17 @@ class _CricketGameScreenState extends State<CricketGameScreen>
               if (col < 1) {
                 rowButtons.add(const SizedBox(width: hSpacing));
               }
+            } else {
+              // Add spacer for empty slots
+              rowButtons.add(const Expanded(child: SizedBox()));
+              if (col < 1) {
+                rowButtons.add(const SizedBox(width: hSpacing));
+              }
             }
-          }        } else {
+          }
+        } else if (hasBull) {
           // Bull row (center it)
-          final value = 25;
+          const value = 25;
           final canScore = _ctrl.canCurrentPlayerScoreOn(value);
           final currentPlayerState = _ctrl.getPlayerState(_ctrl.players[_ctrl.currentPlayer]);
           final hits = currentPlayerState.hits[value]!;
@@ -553,11 +570,10 @@ class _CricketGameScreenState extends State<CricketGameScreen>
               ),
             ),
           );
-          rowButtons.add(const Spacer());
-        }
+          rowButtons.add(const Spacer());        }
         
         rows.add(Expanded(child: Row(children: rowButtons)));
-        if (row < 3) {
+        if (row < totalRows - 1) {
           rows.add(const SizedBox(height: vSpacing));
         }
       }
@@ -744,13 +760,13 @@ class _CricketGameScreenState extends State<CricketGameScreen>
       visible: showTurnChange,
       child: AnimatedOpacity(
         opacity: showTurnChange ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
-        child: OverlayAnimation(
+        duration: const Duration(milliseconds: 300),        child: OverlayAnimation(
           showBust: false,
           showTurnChange: showTurnChange,
           lastTurnPoints: '', // Cricket doesn't show points like traditional
           lastTurnLabels: _ctrl.lastTurnLabels(),
           nextPlayerName: nextPlayerName,
+          animationDuration: _ctrl.animationDuration,
         ),
       ),
     );
@@ -819,7 +835,7 @@ class _CricketGameScreenState extends State<CricketGameScreen>
               Flexible(
                 child: SingleChildScrollView(
                   child: Column(
-                    children: CricketGameController.cricketNumbers.map((number) {
+                    children: _ctrl.cricketNumbersForVariant.map((number) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           vertical: AppDimensions.paddingXS,

@@ -1,7 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dars_scoring_app/theme/index.dart';
-import 'package:dars_scoring_app/widgets/theme_settings_widget.dart';
+import '../theme/index.dart';
+import '../services/settings_service.dart';
+import '../models/app_enums.dart';
+import '../data/possible_finishes.dart';
+
+// Extension for CheckoutRule to provide user-friendly titles and descriptions
+extension CheckoutRuleExtension on CheckoutRule {
+  String get title {
+    switch (this) {
+      case CheckoutRule.doubleOut:
+        return 'Standard Double‐Out';
+      case CheckoutRule.extendedOut:
+        return 'Extended Out';
+      case CheckoutRule.exactOut:
+        return 'Exact 0 Only';
+      case CheckoutRule.openFinish:
+        return 'Open Finish';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case CheckoutRule.doubleOut:
+        return 'Must finish on a double or bull.';
+      case CheckoutRule.extendedOut:
+        return 'Allow finish on double, triple, inner/outer bull.';
+      case CheckoutRule.exactOut:
+        return 'Any segment, but must land exactly on 0.';
+      case CheckoutRule.openFinish:
+        return 'First to 0 or below wins—no bust required.';
+    }
+  }
+}
 
 class OptionsScreen extends StatefulWidget {
   const OptionsScreen({super.key});
@@ -11,19 +43,48 @@ class OptionsScreen extends StatefulWidget {
 }
 
 class _OptionsScreenState extends State<OptionsScreen> {
+  late bool _soundEnabled;
+  late bool _hapticFeedback;
+  late AnimationSpeed _animationSpeed;
+
   @override
   void initState() {
     super.initState();
+    _loadSettings();
   }
-    // Sound and haptic settings are now handled through the SettingsService
-    /// Builds a section header with consistent styling
+  
+  Future<void> _loadSettings() async {
+    final soundEnabled = await SettingsService.getSoundEffectsSetting();
+    final hapticFeedback = await SettingsService.getHapticFeedbackSetting();
+    final animationSpeed = await SettingsService.getAnimationSpeed();
+    
+    setState(() {
+      _soundEnabled = soundEnabled;
+      _hapticFeedback = hapticFeedback;
+      _animationSpeed = animationSpeed;
+    });
+  }
+  
+  Future<void> _toggleDarkMode(bool value) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    themeProvider.setTheme(value);
+  }
+
+  Future<void> _updateAnimationSpeed(AnimationSpeed? value) async {
+    if (value == null) return;
+    setState(() => _animationSpeed = value);
+    await SettingsService.saveAnimationSpeed(value);
+  }
+  
+  /// Builds a section header with consistent styling
   Widget _buildSectionHeader(BuildContext context, String title) {
     final theme = Theme.of(context);
+    final isTablet = MediaQuery.of(context).size.width > 600;
     
     return Padding(
-      padding: const EdgeInsets.only(
-        left: AppDimensions.paddingM,
-        right: AppDimensions.paddingM,
+      padding: EdgeInsets.only(
+        left: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+        right: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
         top: AppDimensions.paddingL,
         bottom: AppDimensions.paddingS,
       ),
@@ -35,10 +96,10 @@ class _OptionsScreenState extends State<OptionsScreen> {
         ),
       ),
     );
-  }
-  @override
+  }  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isTablet = MediaQuery.of(context).size.width > 600;
     
     return Scaffold(
       appBar: AppBar(
@@ -49,16 +110,96 @@ class _OptionsScreenState extends State<OptionsScreen> {
         children: [
           Expanded(
             child: ListView(
-              children: [                // Theme and accessibility settings
-                const ThemeSettingsWidget(),
+              children: [
+                // Theme settings section
+                _buildSectionHeader(context, 'Theme Settings'),
+                
+                SwitchListTile(
+                  title: Text('Dark Mode', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Enable dark theme for low-light environments',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    Provider.of<ThemeProvider>(context).isDarkMode ? 
+                      Icons.dark_mode : Icons.light_mode,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: Provider.of<ThemeProvider>(context).isDarkMode,
+                  onChanged: _toggleDarkMode,
+                ),                
+                const Divider(indent: 16, endIndent: 16),
+                
+                // Sound & Haptics section
+                _buildSectionHeader(context, 'Sound & Haptics'),
+                SwitchListTile(
+                  title: Text('Sound Effects', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Play sound effects during the game',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    _soundEnabled ? Icons.volume_up : Icons.volume_off,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: _soundEnabled,
+                  onChanged: (value) async {
+                    setState(() => _soundEnabled = value);
+                    await SettingsService.saveSoundEffectsSetting(value);
+                  },
+                ),
+                
+                SwitchListTile(
+                  title: Text('Haptic Feedback', style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                    'Use vibration for button presses',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  secondary: Icon(
+                    _hapticFeedback ? Icons.vibration : Icons.do_not_disturb_alt,
+                    color: theme.colorScheme.primary,
+                  ),
+                  value: _hapticFeedback,
+                  onChanged: (value) async {
+                    setState(() => _hapticFeedback = value);
+                    await SettingsService.saveHapticFeedbackSetting(value);
+                  },
+                ),
                 
                 const Divider(indent: 16, endIndent: 16),
-                  // Game settings section
-                _buildSectionHeader(context, 'Game Settings'),
                 
-                const Divider(indent: 16, endIndent: 16),
-                  // Sound & Haptics are now handled in the ThemeSettingsWidget
+                // Animation Settings section
+                _buildSectionHeader(context, 'Animation Settings'),
                 
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? AppDimensions.paddingL : AppDimensions.paddingM,
+                    vertical: AppDimensions.paddingS,
+                  ),
+                  child: Text(
+                    'Animation Speed',
+                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+                  ),
+                ),
+                
+                ...AnimationSpeed.values.map((speed) => Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.marginM,
+                    vertical: AppDimensions.marginXS,
+                  ),
+                  child: RadioListTile<AnimationSpeed>(
+                    title: Text(speed.title, style: theme.textTheme.titleSmall),
+                    subtitle: Text(
+                      speed.description,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    value: speed,
+                    groupValue: _animationSpeed,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: _updateAnimationSpeed,
+                  ),
+                )),
+
                 const SizedBox(height: AppDimensions.marginL),
                 _buildSectionHeader(context, 'Advanced'),
               ],

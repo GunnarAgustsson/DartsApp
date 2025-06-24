@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/cricket_game.dart';
+import '../models/app_enums.dart';
+import 'settings_service.dart';
 
 class CricketGameController extends ChangeNotifier {
   // Constants for timing
@@ -15,6 +17,10 @@ class CricketGameController extends ChangeNotifier {
   // Configuration
   final List<String> players;
   final bool randomOrder;
+  final CricketVariant variant;
+
+  // Animation speed setting
+  AnimationSpeed _animationSpeed = AnimationSpeed.normal;
 
   // Game state
   late CricketGameHistory currentGame;
@@ -52,13 +58,20 @@ class CricketGameController extends ChangeNotifier {
   bool isNumberClosedForAll(int number) {
     return currentGame.playerStates.values
         .every((state) => state.isNumberClosed(number));
-  }
-  /// Check if a player can score on a number (they can hit it if they haven't closed it)
+  }  /// Check if a player can score on a number (rules depend on variant)
   bool canPlayerScoreOn(String playerName, int number) {
     final playerState = currentGame.playerStates[playerName]!;
     
-    // Player can hit a number if they haven't closed it yet
-    return !playerState.isNumberClosed(number);
+    switch (variant) {
+      case CricketVariant.standard:
+        // In standard cricket, you can hit a number if not everyone has closed it
+        return !isNumberClosedForAll(number);
+      
+      case CricketVariant.noScore:
+      case CricketVariant.simplified:
+        // In race/simplified cricket, you can't hit a number once you've closed it
+        return !playerState.isNumberClosed(number);
+    }
   }
 
   /// Check if current player can score on a number
@@ -95,6 +108,7 @@ class CricketGameController extends ChangeNotifier {
   }  /// Constructor
   CricketGameController({
     required this.players,
+    required this.variant,
     CricketGameHistory? resumeGame,
     this.randomOrder = false,
   }) : currentGame = resumeGame ?? 
@@ -111,7 +125,12 @@ class CricketGameController extends ChangeNotifier {
       // If resuming, load prior state
     if (resumeGame != null) {
       _loadFromHistory(resumeGame);
-    }    // Configure audio player - only if not in test environment
+    }
+    
+    // Load animation speed setting
+    _loadAnimationSpeed();
+    
+    // Configure audio player - only if not in test environment
     if (!_isTestEnvironment()) {
       try {
         _audio = AudioPlayer();
@@ -133,6 +152,35 @@ class CricketGameController extends ChangeNotifier {
     
     // Don't notify here as constructor is still running
   }
+  /// Load animation speed setting from persistent storage
+  void _loadAnimationSpeed() async {
+    _animationSpeed = await SettingsService.getAnimationSpeed();
+  }
+  
+  /// Get animation duration based on current speed setting
+  Duration get animationDuration {
+    switch (_animationSpeed) {
+      case AnimationSpeed.none:
+        return Duration.zero;
+      case AnimationSpeed.slow:
+        return const Duration(milliseconds: 1500);
+      case AnimationSpeed.normal:
+        return const Duration(milliseconds: 1000);
+      case AnimationSpeed.fast:
+        return const Duration(milliseconds: 500);
+    }
+  }
+  
+  /// Get cricket numbers based on variant
+  List<int> get cricketNumbersForVariant {
+    switch (variant) {
+      case CricketVariant.simplified:
+        return [20, 19, 18]; // Only 20, 19, 18 for quick mode
+      case CricketVariant.noScore:
+      case CricketVariant.standard:
+        return cricketNumbers; // Full list: 20, 19, 18, 17, 16, 15, 25
+    }
+  }
 
   /// Initialize and save a new game (call this after construction)
   Future<void> initializeNewGame() async {
@@ -145,11 +193,10 @@ class CricketGameController extends ChangeNotifier {
   Future<void> setMultiplier(int v) async {
     multiplier = (multiplier == v) ? 1 : v;
     notifyListeners();
-  }
-  /// Main scoring method: apply a throw value (15-20, 25)
+  }  /// Main scoring method: apply a throw value (15-20, 25)
   Future<void> score(int value) async {
-    // Only allow cricket numbers
-    if (!cricketNumbers.contains(value)) return;
+    // Only allow numbers valid for this variant
+    if (!cricketNumbersForVariant.contains(value)) return;
     
     // Play sound and give haptic feedback
     _playDartSound();
@@ -163,14 +210,23 @@ class CricketGameController extends ChangeNotifier {
     );
     
     currentGame.throws.add(cricketThrow);
-    
-    // Apply the hit to the player's state
+      // Apply the hit to the player's state
     final playerState = currentGame.playerStates[players[currentPlayer]]!;
     final hits = multiplier;
-    
-    // Add hits to the number (cap at 3 since we only need to close)
     final previousHits = playerState.hits[value]!;
-    playerState.hits[value] = (previousHits + hits).clamp(0, 3);
+    
+    // Add hits to the number (track all hits, not just up to 3)
+    playerState.hits[value] = previousHits + hits;
+    
+    // In standard cricket, if player has closed the number but not all players have,
+    // extra hits beyond 3 become points
+    if (variant == CricketVariant.standard && 
+        previousHits >= 3 && 
+        !isNumberClosedForAll(value)) {
+      // All hits beyond closing (3) become points
+      final extraHits = hits;
+      playerState.score += extraHits * value;
+    }
 
     // Check for win condition (first to close all numbers wins)
     if (_checkWinCondition()) {
@@ -185,17 +241,20 @@ class CricketGameController extends ChangeNotifier {
     
     // Reset multiplier and save
     multiplier = 1;
-    currentGame.modifiedAt = DateTime.now();
-    _debouncedSave();
+    currentGame.modifiedAt = DateTime.now();    _debouncedSave();
     
     notifyListeners();
   }
+
   /// Check if current player has won
   bool _checkWinCondition() {
     final playerState = currentGame.playerStates[players[currentPlayer]];
     
-    // Simple rule: first player to close all numbers wins
-    return playerState!.allNumbersClosed;
+    // Get the numbers this variant needs to close
+    final numbersToClose = cricketNumbersForVariant;
+    
+    // Check if all required numbers are closed
+    return numbersToClose.every((number) => playerState!.isNumberClosed(number));
   }
 
   /// Handle a winning throw
