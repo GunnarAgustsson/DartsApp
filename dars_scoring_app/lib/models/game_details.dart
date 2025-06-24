@@ -64,9 +64,39 @@ class CricketGameDetails {
       randomOrder: randomOrder ?? this.randomOrder,
     );
   }
-
   @override
   String toString() {
     return 'CricketGameDetails(players: $players, variant: $variant, randomOrder: $randomOrder)';
+  }
+}
+
+/// Details for setting up a Donkey game
+class DonkeyGameDetails {
+  final List<String> players;
+  final DonkeyVariant variant;
+  final bool randomOrder;
+
+  const DonkeyGameDetails({
+    required this.players,
+    required this.variant,
+    required this.randomOrder,
+  });
+
+  /// Create a copy with updated values
+  DonkeyGameDetails copyWith({
+    List<String>? players,
+    DonkeyVariant? variant,
+    bool? randomOrder,
+  }) {
+    return DonkeyGameDetails(
+      players: players ?? this.players,
+      variant: variant ?? this.variant,
+      randomOrder: randomOrder ?? this.randomOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'DonkeyGameDetails(players: $players, variant: $variant, randomOrder: $randomOrder)';
   }
 }

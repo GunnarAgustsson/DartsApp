@@ -11,6 +11,12 @@ enum CricketVariant {
   simplified  // Quick Cricket (20, 19, 18 only)
 }
 
+/// Donkey game variants (HORSE-style game)
+enum DonkeyVariant {
+  oneDart,   // One dart per turn - quick gameplay
+  threeDart  // Three darts per turn - more strategic
+}
+
 /// Animation speed options for the app
 enum AnimationSpeed {
   none,     // Instant updates, no animations
@@ -47,9 +53,37 @@ extension CricketVariantExtension on CricketVariant {
       case CricketVariant.standard:
         return 'Close all numbers (20-15, Bull) and score points. Win by closing all with highest score.';
       case CricketVariant.noScore:
-        return 'Close all numbers (20-15, Bull). First to close all numbers wins - no scoring.';
-      case CricketVariant.simplified:
+        return 'Close all numbers (20-15, Bull). First to close all numbers wins - no scoring.';      case CricketVariant.simplified:
         return 'Close 20, 19, 18. First to close all three numbers wins - no scoring.';
+    }
+  }
+}
+
+extension DonkeyVariantExtension on DonkeyVariant {
+  String get title {
+    switch (this) {
+      case DonkeyVariant.oneDart:
+        return 'One Dart Donkey';
+      case DonkeyVariant.threeDart:
+        return 'Three Dart Donkey';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case DonkeyVariant.oneDart:
+        return 'Beat the previous score with one dart. First to spell DONKEY loses.';
+      case DonkeyVariant.threeDart:
+        return 'Beat the previous score with up to three darts. First to spell DONKEY loses.';
+    }
+  }
+
+  int get dartsPerTurn {
+    switch (this) {
+      case DonkeyVariant.oneDart:
+        return 1;
+      case DonkeyVariant.threeDart:
+        return 3;
     }
   }
 }
@@ -87,11 +121,11 @@ extension AnimationSpeedExtension on AnimationSpeed {
       case AnimationSpeed.none:
         return 0;
       case AnimationSpeed.slow:
-        return 800;
+        return 2000;
       case AnimationSpeed.normal:
-        return 400;
+        return 1000;
       case AnimationSpeed.fast:
-        return 200;
+        return 500;
     }
   }
 

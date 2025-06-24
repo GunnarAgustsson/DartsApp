@@ -6,6 +6,7 @@ import '../models/game_details.dart';
 import '../data/possible_finishes.dart';
 import 'traditional_game_screen.dart';
 import 'cricket_game_screen.dart';
+import 'donkey_game_screen.dart';
 
 class GameModeScreen extends StatelessWidget {
   const GameModeScreen({super.key});
@@ -345,6 +346,152 @@ class GameModeScreen extends StatelessWidget {
           ),
         );
       },
+    );  }
+
+  /// Show dialog to select donkey game variant
+  Future<DonkeyGameDetails?> _showDonkeyGameDialog(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final players = await _getPlayers();
+    final selectedPlayersList = <String>[];
+
+    bool randomOrder = prefs.getBool('randomOrder') ?? false;
+    DonkeyVariant selectedVariant = DonkeyVariant.oneDart;
+
+    return showDialog<DonkeyGameDetails>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text('Setup Donkey Game'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select Donkey Variant:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<DonkeyVariant>(
+                      value: selectedVariant,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                      ),
+                      isExpanded: true,
+                      items: DonkeyVariant.values.map((DonkeyVariant variant) {
+                        return DropdownMenuItem<DonkeyVariant>(
+                          value: variant,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(variant.title, style: const TextStyle(fontSize: 16)),
+                              Text(
+                                variant.description,
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (DonkeyVariant? newValue) {
+                        if (newValue != null) {
+                          setStateDialog(() {
+                            selectedVariant = newValue;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Random Order Checkbox
+                    CheckboxListTile(
+                      title: const Text('Random Player Order', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                        randomOrder 
+                            ? 'Players will be shuffled randomly at game start and on play again'
+                            : 'Players will follow selection order, shifting by one on play again',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      value: randomOrder,
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          randomOrder = value ?? false;
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    const Text('Select Players (2-8 players):', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        final isSelected = selectedPlayersList.contains(player);
+                        final order = isSelected ? selectedPlayersList.indexOf(player) + 1 : null;
+
+                        return ListTile(
+                          leading: isSelected
+                              ? CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                                  child: Text(
+                                    '$order',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : const CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Colors.grey,
+                                  child: SizedBox(),
+                                ),
+                          title: Text(player),
+                          onTap: () {
+                            setStateDialog(() {
+                              if (isSelected) {
+                                selectedPlayersList.remove(player);
+                              } else if (selectedPlayersList.length < 8) {
+                                selectedPlayersList.add(player);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedPlayersList.length < 2
+                    ? null
+                    : () => Navigator.of(context).pop(DonkeyGameDetails(
+                        players: selectedPlayersList.toList(), 
+                        variant: selectedVariant, 
+                        randomOrder: randomOrder
+                      )),
+                child: const Text('Start Game'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -416,6 +563,31 @@ class GameModeScreen extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (context) => CricketGameScreen(
+            players: finalPlayerOrder,
+            randomOrder: selectionDetails.randomOrder,
+            variant: selectionDetails.variant,
+          ),
+        ),
+      );
+    }  }
+
+  void _onDonkeyGameSelected(BuildContext context) async {
+    final selectionDetails = await _showDonkeyGameDialog(context);
+
+    if (selectionDetails != null && selectionDetails.players.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('lastSelectedPlayers', selectionDetails.players);
+      await prefs.setBool('randomOrder', selectionDetails.randomOrder);
+
+      List<String> finalPlayerOrder = List.from(selectionDetails.players);
+      if (selectionDetails.randomOrder) {
+        finalPlayerOrder.shuffle();
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DonkeyGameScreen(
             players: finalPlayerOrder,
             randomOrder: selectionDetails.randomOrder,
             variant: selectionDetails.variant,
@@ -509,8 +681,7 @@ class GameModeScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppDimensions.marginXL),
-                  
-                  if (isLandscape && size.width > 800)
+                    if (isLandscape && size.width > 1200)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -527,6 +698,13 @@ class GameModeScreen extends StatelessWidget {
                           description: 'Standard, Race, or Quick Cricket variants',
                           icon: Icons.sports_baseball,
                           onTap: () => _onCricketGameSelected(context),
+                        ),
+                        _buildGameModeCard(
+                          context: context,
+                          title: 'Donkey',
+                          description: 'HORSE-style game - beat the score or get a letter',
+                          icon: Icons.psychology,
+                          onTap: () => _onDonkeyGameSelected(context),
                         ),
                       ],
                     )
@@ -546,6 +724,13 @@ class GameModeScreen extends StatelessWidget {
                           description: 'Standard, Race, or Quick Cricket variants',
                           icon: Icons.sports_baseball,
                           onTap: () => _onCricketGameSelected(context),
+                        ),
+                        _buildGameModeCard(
+                          context: context,
+                          title: 'Donkey',
+                          description: 'HORSE-style game - beat the score or get a letter',
+                          icon: Icons.psychology,
+                          onTap: () => _onDonkeyGameSelected(context),
                         ),
                       ],
                     ),

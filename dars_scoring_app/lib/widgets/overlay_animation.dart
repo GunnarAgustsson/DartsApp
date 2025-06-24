@@ -9,9 +9,13 @@ enum OverlaySize { small, medium, large }
 class OverlayAnimation extends StatelessWidget {
   /// Whether to show the bust overlay
   final bool showBust;
-  
-  /// Whether to show the turn change overlay
+    /// Whether to show the turn change overlay
   final bool showTurnChange;
+    /// Whether to show the letter received overlay
+  final bool showLetterReceived;
+  
+  /// Whether to show the player eliminated overlay
+  final bool showPlayerEliminated;
   
   /// Background color for the overlay
   final Color? bgColor;
@@ -25,20 +29,28 @@ class OverlayAnimation extends StatelessWidget {
   /// Name of the next player
   final String nextPlayerName;
 
+  /// Player who received a letter
+  final String letterReceivedPlayer;
+  
+  /// Letters the player now has
+  final String letterReceivedLetters;
+
   /// Size variant for the overlay
   final OverlaySize size;
 
   /// Animation duration for this overlay
-  final Duration animationDuration;
-
-  const OverlayAnimation({
+  final Duration animationDuration;  const OverlayAnimation({
     super.key,
     required this.showBust,
     required this.showTurnChange,
+    this.showLetterReceived = false,
+    this.showPlayerEliminated = false,
     this.bgColor,
     required this.lastTurnPoints,
     required this.lastTurnLabels,
     required this.nextPlayerName,
+    this.letterReceivedPlayer = '',
+    this.letterReceivedLetters = '',
     this.size = OverlaySize.large,
     this.animationDuration = const Duration(milliseconds: 300),
   });@override
@@ -64,12 +76,12 @@ class OverlayAnimation extends StatelessWidget {
         turnNameFontSize = 36;
         turnTextFontSize = 28;
         break;
-    }
-    
-    // Use theme colors if bgColor not provided
+    }      // Use theme colors if bgColor not provided
     final backgroundColor = bgColor ?? (showBust 
         ? AppColors.bustOverlayRed 
-        : AppColors.turnChangeBlue);
+        : (showLetterReceived || showPlayerEliminated)
+            ? AppColors.bustOverlayRed  // Red for letter received and elimination
+            : AppColors.turnChangeBlue);
     
     return Container(
       decoration: BoxDecoration(
@@ -89,24 +101,66 @@ class OverlayAnimation extends StatelessWidget {
                 style: AppTextStyles.bustOverlay().copyWith(
                   fontSize: bustFontSize,
                 ))
-            : showTurnChange
+            : showPlayerEliminated
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Scored: $lastTurnPoints',
-                        style: AppTextStyles.turnChangeOverlay().copyWith(
+                        '$letterReceivedPlayer is eliminated!',
+                        style: AppTextStyles.bustOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 8 * (turnNameFontSize / 40)),
+                      SizedBox(height: 12 * (turnNameFontSize / 40)),
                       Text(
-                        lastTurnLabels,
-                        style: AppTextStyles.turnChangeOverlay().copyWith(
-                          fontSize: turnTextFontSize,
+                        '$letterReceivedPlayer is a DONKEY! 🐴',
+                        style: AppTextStyles.bustOverlay().copyWith(
+                          fontSize: turnTextFontSize + 4,
                           fontWeight: FontWeight.normal,
                         ),
+                      ),
+                    ],
+                  )
+                : showLetterReceived
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$letterReceivedPlayer got a letter!',
+                            style: AppTextStyles.bustOverlay().copyWith(
+                              fontSize: turnNameFontSize,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 12 * (turnNameFontSize / 40)),
+                          Text(
+                            'Letters: ${letterReceivedLetters.split('').join('-')}',
+                            style: AppTextStyles.bustOverlay().copyWith(
+                              fontSize: turnTextFontSize + 4,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      )
+                : showTurnChange
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Scored: $lastTurnPoints',
+                            style: AppTextStyles.turnChangeOverlay().copyWith(
+                              fontSize: turnNameFontSize,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 8 * (turnNameFontSize / 40)),
+                          Text(
+                            lastTurnLabels,
+                            style: AppTextStyles.turnChangeOverlay().copyWith(
+                              fontSize: turnTextFontSize,
+                              fontWeight: FontWeight.normal,
+                            ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(

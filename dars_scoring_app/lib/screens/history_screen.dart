@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:collection/collection.dart'; // For grouping
 import 'traditional_game_screen.dart';
 import 'cricket_game_screen.dart';
+import 'donkey_game_screen.dart';
 import '../models/unified_game_history.dart';
 import '../models/app_enums.dart';
 
@@ -36,6 +37,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final cricketRaw = prefs.getStringList('cricket_games') ?? [];
     debugPrint('Loading cricket games, raw count: ${cricketRaw.length}');
     
+    // Load donkey games
+    final donkeyRaw = prefs.getStringList('donkey_games') ?? [];
+    debugPrint('Loading donkey games, raw count: ${donkeyRaw.length}');
+    
     List<UnifiedGameHistory> allGames = [];    // Parse traditional games
     for (String rawGame in traditionalRaw) {
       try {
@@ -56,11 +61,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
     
+    // Parse donkey games
+    for (String rawGame in donkeyRaw) {
+      try {
+        final game = UnifiedGameHistory.fromJson(jsonDecode(rawGame));
+        allGames.add(game);
+      } catch (e) {
+        debugPrint('Error parsing donkey game: $e');
+      }
+    }
+    
     setState(() {
       games = allGames..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Most recent first
       isLoading = false;
       
-      debugPrint('Parsed ${games.length} total games successfully (${traditionalRaw.length} traditional, ${cricketRaw.length} cricket)');
+      debugPrint('Parsed ${games.length} total games successfully (${traditionalRaw.length} traditional, ${cricketRaw.length} cricket, ${donkeyRaw.length} donkey)');
     });
   }
 
@@ -83,12 +98,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (gameDate.isAfter(thisWeekStart)) return 'This Week';
       return 'Earlier';
     });
-  }
-  Future<void> _deleteGame(int idx) async {
+  }  Future<void> _deleteGame(int idx) async {
     final prefs = await SharedPreferences.getInstance();
     final gameToDelete = games[idx];
     
-    if (gameToDelete.isCricket) {
+    if (gameToDelete.gameType == GameType.cricket) {
       // Delete from cricket games
       final List<String> cricketGamesRaw = prefs.getStringList('cricket_games') ?? [];
       final rawIdx = cricketGamesRaw.indexWhere((raw) {
@@ -99,6 +113,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (rawIdx >= 0) {
         cricketGamesRaw.removeAt(rawIdx);
         await prefs.setStringList('cricket_games', cricketGamesRaw);
+      }
+    } else if (gameToDelete.gameType == GameType.donkey) {
+      // Delete from donkey games
+      final List<String> donkeyGamesRaw = prefs.getStringList('donkey_games') ?? [];
+      final rawIdx = donkeyGamesRaw.indexWhere((raw) {
+        final game = jsonDecode(raw);
+        return game['id'] == gameToDelete.id;
+      });
+      
+      if (rawIdx >= 0) {
+        donkeyGamesRaw.removeAt(rawIdx);
+        await prefs.setStringList('donkey_games', donkeyGamesRaw);
       }
     } else {
       // Delete from traditional games
@@ -118,7 +144,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       games.removeAt(idx);
     });
   }void _showGameDetailsDialog(UnifiedGameHistory game) {
-    if (!game.isCricket) {
+    if (game.gameType != GameType.cricket) {
       _showTraditionalGameDetails(game.traditionalGame!);
     } else {
       _showCricketGameDetails(game.cricketGame!);
@@ -469,14 +495,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (multiplier == 3) return 'T$value';
     return '$value';
   }
-
   void _resumeGame(UnifiedGameHistory game) {
-    if (game.isCricket) {
+    if (game.gameType == GameType.cricket) {
       Navigator.of(context).push(        MaterialPageRoute(
           builder: (_) => CricketGameScreen(
             players: game.players,
             gameHistory: game.cricketGame,
             variant: CricketVariant.standard, // Default for resumed games
+          ),
+        ),
+      );
+    } else if (game.gameType == GameType.donkey) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DonkeyGameScreen(
+            players: game.donkeyGame!.originalPlayers,
+            gameHistory: game.donkeyGame,
+            randomOrder: false, // Default for resumed games
+            variant: game.donkeyGame!.variant,
           ),
         ),
       );
