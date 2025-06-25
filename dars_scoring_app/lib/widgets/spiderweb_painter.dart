@@ -1,42 +1,56 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:dars_scoring_app/theme/app_colors.dart';
 
 class SpiderWebPainter extends CustomPainter {
-  final Map<int, int> hitMap;
+  final Map<int, int> originalHitMap; // To store the original hitMap for comparison
+  final Map<int, int> _processedHitMap; // Internal map with all numbers initialized
   final int maxHits;
   final Brightness brightness;
   
   // Standard dartboard arrangement (clockwise from top)
   final List<int> dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
   
-  SpiderWebPainter(this.hitMap, this.maxHits, this.brightness);
+  SpiderWebPainter(Map<int, int> hitMap, this.maxHits, this.brightness) : 
+    originalHitMap = Map.from(hitMap), // Store a copy of the original map
+    _processedHitMap = {
+      // Initialize all dartboard numbers and bullseye numbers
+      for (final number in const [
+        20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5, // Standard numbers
+        25, 50 // Bullseye numbers
+      ])
+        number: hitMap[number] ?? 0, // If number not in hitMap, default to 0
+    };
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 20;
     
-    final Paint webPaint = Paint()
+  final Paint webPaint = Paint()
       ..color = brightness == Brightness.dark ? Colors.white30 : Colors.black12
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
-      
-    final Paint hitPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.5)
+        final Paint hitPaint = Paint()
+      ..color = brightness == Brightness.dark 
+          ? AppColors.primaryGreen.shade600.withOpacity(0.7) 
+          : AppColors.primaryGreen.withOpacity(0.6)
       ..style = PaintingStyle.fill;
       
     final Paint numberCirclePaint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = brightness == Brightness.dark 
+          ? AppColors.darkCardBackground.withOpacity(0.5) 
+          : AppColors.lightCardBackground.withOpacity(0.7)
       ..style = PaintingStyle.fill;
       
-    final TextStyle numberStyle = TextStyle(
+  final TextStyle numberStyle = TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.bold,
-      color: brightness == Brightness.dark ? Colors.white : Colors.black,
+      color: brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
     );
     
     // Draw concentric circles
-    final int rings = 5;
+    const int rings = 5;
     for (int i = 1; i <= rings; i++) {
       final double ringRadius = radius * i / rings;
       canvas.drawCircle(center, ringRadius, webPaint);
@@ -53,15 +67,17 @@ class SpiderWebPainter extends CustomPainter {
     // Draw hit polygon
     final Path hitPath = Path();
     bool firstPoint = true;
-    
-    for (int i = 0; i < dartboardNumbers.length; i++) {
+      for (int i = 0; i < dartboardNumbers.length; i++) {
       final int number = dartboardNumbers[i];
-      final int hitCount = hitMap[number] ?? 0;
-      
-      // Calculate the percentage of max hits
+      final int hitCount = _processedHitMap[number]!; // Use processed map
+        // Calculate the percentage of max hits with a minimum radius for zero hits
       final double percentage = maxHits > 0 ? hitCount / maxHits : 0;
       final double angle = 2 * math.pi * i / dartboardNumbers.length - math.pi / 2;
-      final double hitRadius = radius * percentage;
+      
+      // Set minimum radius for zero hits to show a more visible circle (about 15% of the radius)
+      final double minRadius = radius * 0.15;
+      final double hitRadius = hitCount == 0 ? minRadius : math.max(minRadius, radius * percentage);
+      
       final double x = center.dx + hitRadius * math.cos(angle);
       final double y = center.dy + hitRadius * math.sin(angle);
       
@@ -76,12 +92,13 @@ class SpiderWebPainter extends CustomPainter {
     hitPath.close();
     // Fill with the existing blue color
     canvas.drawPath(hitPath, hitPaint);
-    
-    // Add this code: Draw a 1px black outline around the shape
+      // Add this code: Draw a more visible outline around the shape
     final Paint outlinePaint = Paint()
-      ..color = Colors.black
+      ..color = brightness == Brightness.dark 
+          ? Colors.white.withOpacity(0.6)
+          : Colors.black.withOpacity(0.8)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+      ..strokeWidth = 2.0;
   
     canvas.drawPath(hitPath, outlinePaint);
     
@@ -99,12 +116,11 @@ class SpiderWebPainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), 10, numberCirclePaint);
       
       // Draw number text
-      final hitCount = hitMap[number] ?? 0;
+      final hitCount = _processedHitMap[number]!; // Use processed map
       final TextSpan span = TextSpan(
         text: number.toString(),
-        style: numberStyle.copyWith(
-          color: hitCount > 0 ? 
-            Color.lerp(Colors.blue, Colors.red, hitCount / (maxHits > 0 ? maxHits : 1)) : 
+        style: numberStyle.copyWith(          color: hitCount > 0 ? 
+            Color.lerp(AppColors.primaryGreen, AppColors.secondaryRed, hitCount / (maxHits > 0 ? maxHits : 1)) : 
             numberStyle.color,
           fontWeight: hitCount > 0 ? FontWeight.bold : FontWeight.normal,
         ),
@@ -121,14 +137,15 @@ class SpiderWebPainter extends CustomPainter {
     }
     
     // Draw bullseye (25/50) if exists in data
-    final int bullCount = (hitMap[25] ?? 0) + (hitMap[50] ?? 0);
-    if (bullCount > 0) {
-      final double bullPercentage = maxHits > 0 ? bullCount / maxHits : 0;
+    final int bullCount = (_processedHitMap[25]! + _processedHitMap[50]!); // Use processed map
+    // Only draw bullseye indicator if it has hits.
+    if (bullCount > 0 && maxHits > 0) {
+      final double bullPercentage = bullCount / maxHits; // Ensure maxHits is not zero
       canvas.drawCircle(
         center, 
-        10, 
+        10, // Keep a fixed size for the bullseye indicator for now
         Paint()
-          ..color = Color.lerp(Colors.blue, Colors.red, bullPercentage) ?? Colors.blue
+          ..color = Color.lerp(AppColors.primaryGreen, AppColors.secondaryRed, bullPercentage) ?? AppColors.primaryGreen
           ..style = PaintingStyle.fill
       );
       
@@ -156,37 +173,35 @@ class SpiderWebPainter extends CustomPainter {
     // Draw legend
     _drawLegend(canvas, size, rings);
   }
-  
-  void _drawLegend(Canvas canvas, Size size, int rings) {
-    final Paint legendPaint = Paint()
-      ..color = brightness == Brightness.dark ? Colors.white70 : Colors.black54
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-      
+    void _drawLegend(Canvas canvas, Size size, int rings) {
     final TextStyle legendStyle = TextStyle(
       fontSize: 10,
-      color: brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+      color: brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
     );
     
-    // Draw percentage indicators
-    for (int i = 1; i <= rings; i++) {
-      final double percentage = i / rings * 100;
-      final String label = '${percentage.toInt()}%';
-      
-      final TextSpan span = TextSpan(text: label, style: legendStyle);
-      final TextPainter tp = TextPainter(
-        text: span,
-        textDirection: TextDirection.ltr,
-      );
-      
-      tp.layout();
-      tp.paint(canvas, Offset(size.width / 2 + 5, size.height / 2 - (size.height / 2 - 20) * i / rings - tp.height / 2));
+    // Draw numerical indicators based on maxHits
+    if (rings > 0) {
+      for (int i = 1; i <= rings; i++) {
+        // Calculate the hit value for this ring
+        // The outermost ring (i == rings) should represent maxHits
+        final double valueForRing = (maxHits.toDouble() * i) / rings;
+        final String label = valueForRing.round().toString();
+        
+        final TextSpan span = TextSpan(text: label, style: legendStyle);
+        final TextPainter tp = TextPainter(
+          text: span,
+          textDirection: TextDirection.ltr,
+        );
+        
+        tp.layout();
+        tp.paint(canvas, Offset(size.width / 2 + 5, size.height / 2 - (size.height / 2 - 20) * i / rings - tp.height / 2));
+      }
     }
   }
 
   @override
   bool shouldRepaint(SpiderWebPainter oldDelegate) {
-    return oldDelegate.hitMap != hitMap || 
+    return oldDelegate.originalHitMap != originalHitMap || // Compare with the original map
            oldDelegate.maxHits != maxHits ||
            oldDelegate.brightness != brightness;
   }

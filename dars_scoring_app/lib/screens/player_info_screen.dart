@@ -23,8 +23,7 @@ class PlayerInfoScreen extends StatefulWidget {
 class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerProviderStateMixin {
   // Add tab controller
   late TabController _tabController;
-  
-  // Existing state variables
+    // Existing state variables
   List<Map<String, dynamic>> lastGames = [];
   double avgScore = 0.0;
   double winRate = 0.0;
@@ -45,18 +44,14 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
   List<double> _avgPerGameTrend = [];
   int _countSingles = 0, _countDoubles = 0, _countTriples = 0, _countBulls = 0;
   Map<String, int> _finishCount = {};
-  
-  // New statistics
+    // New statistics
   double _first9Average = 0.0;
   double _checkoutEfficiency = 0.0;
   String _favoriteCheckout = "";
-  int _favoriteCheckoutCount = 0;
   double _consistencyRating = 0.0;
-  double _improvementRate = 0.0;
-  String _bestDayToPlay = "";
-  Map<String, int> _finishAttempts = {};
+  int _largestRoundScore = 0;
+  int _largestBustScore = 0;
   bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -87,9 +82,10 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     int finishedLegs = 0;
     Map<int, int> hitCount = {};
     List<bool> lastResults = [];
-    final List<double> perGameAvgs = [];
-    final Map<String, int> finishMap = {};
+    final List<double> perGameAvgs = [];    final Map<String, int> finishMap = {};
     int singles = 0, doubles = 0, triples = 0, bulls = 0;
+    int largestRound = 0;
+    int largestBust = 0;
 
     // For winrate, count only completed games
     for (final g in games.reversed) {
@@ -171,9 +167,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
       }
 
       gamesCounted++;
-      if (gamesCounted == 8) break; // Only last 8 completed games
-
-      // Count segment‐type distribution
+      if (gamesCounted == 8) break; // Only last 8 completed games      // Count segment‐type distribution
       for (final t in throws) {
         if (t['wasBust'] == true) continue;
         final v = t['value'] as int;
@@ -186,6 +180,30 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
           doubles++;
         } else {
           singles++;
+        }
+      }
+
+      // Track largest round score and largest bust
+      // Group throws by consecutive turns (3 darts each)
+      for (int i = 0; i < throws.length; i += 3) {
+        final roundThrows = throws.skip(i).take(3).toList();
+        int roundScore = 0;
+        bool isBustRound = false;
+        
+        for (final t in roundThrows) {
+          if (t['wasBust'] == true) {
+            isBustRound = true;
+            break;
+          }
+          final value = (t['value'] as int? ?? 0);
+          final multiplier = (t['multiplier'] as int? ?? 1);
+          roundScore += value * multiplier;
+        }
+        
+        if (isBustRound && roundScore > largestBust) {
+          largestBust = roundScore;
+        } else if (!isBustRound && roundScore > largestRound) {
+          largestRound = roundScore;
         }
       }
 
@@ -257,9 +275,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     }
     
     // Now call _calculateAdvancedStats to get other statistics
-    _calculateAdvancedStats(games);
-
-    setState(() {
+    _calculateAdvancedStats(games);    setState(() {
       lastGames = playerGames;
       avgScore = allScores.isNotEmpty
           ? allScores.reduce((a, b) => a + b) / allScores.length
@@ -278,11 +294,11 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
       _countSingles = singles;
       _countDoubles = doubles;
       _countTriples = triples;
-      _countBulls = bulls;
-      _finishCount = finishMap;
+      _countBulls = bulls;      _finishCount = finishMap;
       _isLoading = false;
       _checkoutEfficiency = checkoutAttempts > 0 ? (checkoutSuccesses / checkoutAttempts) * 100 : 0.0;
-      _finishAttempts = {'attempts': checkoutAttempts, 'successes': checkoutSuccesses};
+      _largestRoundScore = largestRound;
+      _largestBustScore = largestBust;
     });
   }
 
@@ -333,43 +349,26 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         
         if (resultingScore == 0) {
           print("FOUND A CHECKOUT!");
-          // Record checkout route (last 1-3 darts)
-          final checkoutSequence = <String>[];
-          int i = throws.length - 1;
-          
-          // Start with the final dart and go backwards to get the checkout sequence
-          int remainingScore = 0;
-          int j = i;
-          while (j >= 0 && checkoutSequence.length < 3) {
-            final ct = throws[j];
-            final v = ct['value'] as int? ?? 0;
-            final m = ct['multiplier'] as int? ?? 1;
-            remainingScore += v * m;
-            
-            if (remainingScore > 170) break; // Too high to be part of checkout
-            
-            String code;
-            if (v == 50) {
-              code = 'DB';
-            } else if (v == 25 && m == 1) code = 'SB';
-            else if (m == 3) code = 'T$v';
-            else if (m == 2) code = 'D$v';
-            else code = 'S$v';
-            
-            checkoutSequence.insert(0, code);
-            
-            // For debugging
-            print("Added $code to checkout sequence - remaining score was $remainingScore");
-            
-            j--;
+          // Record checkout route (ONLY the last dart)
+          final v = lastThrow['value'] as int? ?? 0;
+          final m = lastThrow['multiplier'] as int? ?? 1;
+          String route; // This will be the single segment code of the last dart
+
+          if (v == 50) {
+            route = 'DB';
+          } else if (v == 25 && m == 1) { // Ensure SB is m == 1
+            route = 'SB';
+          } else if (m == 3) {
+            route = 'T$v';
+          } else if (m == 2) {
+            route = 'D$v';
+          } else {
+            route = 'S$v'; // Single (non-bull)
           }
           
-          // Only record if we found a valid checkout sequence
-          if (checkoutSequence.isNotEmpty) {
-            final route = checkoutSequence.join('-');
-            print("Recording checkout route: $route");
-            checkoutRoutes[route] = (checkoutRoutes[route] ?? 0) + 1;
-          }
+          // For debugging
+          print("Recording checkout route (single dart): $route");
+          checkoutRoutes[route] = (checkoutRoutes[route] ?? 0) + 1;
         }
       }
       
@@ -408,9 +407,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         maxCount = count;
         favoriteRoute = route;
       }
-    });
-    _favoriteCheckout        = favoriteRoute;
-    _favoriteCheckoutCount   = maxCount;
+    });    _favoriteCheckout        = favoriteRoute;
     
     // Consistency Rating (inverse of coefficient of variation, scaled to 0-100)
     if (allGameAverages.length > 1) {
@@ -426,36 +423,27 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     }
     
     // Improvement Rate (linear regression of game averages)
-    if (allGameAverages.length > 3) {
-      // Simple linear regression
-      final n = allGameAverages.length;
-      final indices = List.generate(n, (i) => i.toDouble());
+    if (allGameAverages.length > 3) {      // Simple linear regression
+      // final n = allGameAverages.length;
+      // final indices = List.generate(n, (i) => i.toDouble());
       
-      final sumX = indices.reduce((a, b) => a + b);
-      final sumY = allGameAverages.reduce((a, b) => a + b);
-      final sumXY = indices.asMap().entries.fold<double>(
-        0.0,
-        (double sum, MapEntry<int, double> entry) =>
-          sum + entry.value * allGameAverages[entry.key],
-      );
-      final sumX2 = indices.fold<double>(0.0, (double sum, double x) => sum + x * x);
-      
+      // Note: For trend analysis, variables would be used for slope calculation
+      // final sumX = indices.reduce((a, b) => a + b);
+      // final sumY = allGameAverages.reduce((a, b) => a + b);
+      // final sumXY = indices.asMap().entries.fold<double>(
+      //   0.0,
+      //   (double sum, MapEntry<int, double> entry) =>
+      //     sum + entry.value * allGameAverages[entry.key],
+      // );
+      // final sumX2 = indices.fold<double>(0.0, (double sum, double x) => sum + x * x);
       // avoid division by zero
-      final denom = (n * sumX2 - sumX * sumX);
-      final slope = denom != 0.0
-          ? (n * sumXY - sumX * sumY) / denom
-          : 0.0;
+      // final denom = (n * sumX2 - sumX * sumX);
       
-      // Convert to a percentage change per game
-      final meanY = sumY / n;
-      _improvementRate = meanY != 0 ? (slope / meanY) * 100 : 0;
+      // Remove calculation as improvement rate is not displayed
     } else {
-      _improvementRate = 0.0;
-    }
-    
-    // Best Day To Play
+      // Remove assignment to undefined variable
+    }    // Best Day To Play (removed unused variable assignment)
     double bestWinRate = 0.0;
-    String bestDay = "";
     
     gamesByDay.forEach((day, games) {
       if (games > 0) {
@@ -463,13 +451,11 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         final rate = (wins / games) * 100;
         if (rate > bestWinRate) {
           bestWinRate = rate;
-          bestDay = day;
+          // Remove assignment to unused variable
         }
       }
     });
-    _bestDayToPlay = gamesByDay.values.fold<int>(0, (a, b) => a + b) > 0
-        ? "$bestDay (${bestWinRate.toStringAsFixed(0)}%)"
-        : "N/A";
+    // Removed assignment to undefined variable
   }
 
   Map<int, int> _filteredHeatmap(HitTypeFilter hitTypeFilter) {
@@ -488,18 +474,15 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     
       // Apply dart count filter FIRST - this is crucial
       // The count filter should be applied to the entire throw set
-      switch (_selectedCountFilter) {
-        case DartCountFilter.first9:
+      switch (_selectedCountFilter) {        case DartCountFilter.first9:
           throwsList = throwsList.take(9).toList();
           break;
         case DartCountFilter.first12:
           throwsList = throwsList.take(12).toList();
           break;
         case DartCountFilter.all:
-        default:
           break;
       }
-    
       // THEN apply hit type filter
       for (final t in throwsList) {
         if (t['wasBust'] == true) continue;
@@ -507,22 +490,20 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         final v = t['value'] as int? ?? 0;
         final m = t['multiplier'] as int? ?? 1;
       
-        // Special handling for bulls
+        // Skip bullseye (25 and 50) from hit pattern analysis
+        if (v == 25 || v == 50) continue;
+      
+        // Special handling for other segments
         bool shouldCount = false;
       
         if (hitTypeFilter == HitTypeFilter.all) {
           shouldCount = true;
         } else if (hitTypeFilter == HitTypeFilter.singles) {
-          shouldCount = (m == 1 && v != 25 && v != 50); // Regular singles
+          shouldCount = (m == 1); // Regular singles (bullseye already excluded above)
         } else if (hitTypeFilter == HitTypeFilter.doubles) {
-          shouldCount = (m == 2 || v == 50); // Doubles and double bull
+          shouldCount = (m == 2); // Doubles (bullseye excluded)
         } else if (hitTypeFilter == HitTypeFilter.triples) {
           shouldCount = (m == 3); // Triples
-        }
-      
-        // Special case for bulls in any filter
-        if ((v == 25 || v == 50) && hitTypeFilter == HitTypeFilter.all) {
-          shouldCount = true;
         }
       
         if (shouldCount) {
@@ -530,9 +511,8 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         }
       }
     }
-
-    return filtered;
-  }
+    
+    return filtered;  }
 
   void _showGameDetailsDialog(Map<String, dynamic> game) {
     final throws = (game['throws'] as List)
@@ -605,20 +585,16 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
             onPressed: _loadStats,
             tooltip: 'Refresh Stats',
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
+        ],        bottom: TabBar(
+          controller: _tabController,          tabs: const [
             Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
             Tab(icon: Icon(Icons.insights), text: 'Trends'),
             Tab(icon: Icon(Icons.sports), text: 'Hitting'),
             Tab(icon: Icon(Icons.history), text: 'History'),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
+      ),      body: TabBarView(
+        controller: _tabController,        children: [
           _buildOverviewTab(),
           _buildTrendsTab(),
           _buildHittingTab(),
@@ -741,38 +717,62 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
       ),
     );
   }
-
   Widget _buildHeaderCard() {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue.shade700, Colors.indigo.shade900],
+            colors: [
+              Colors.blue.shade600,
+              Colors.blue.shade800,
+              Colors.indigo.shade900,
+            ],
+            stops: const [0.0, 0.5, 1.0],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            // Player info header
             Row(
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: Colors.white.withOpacity(0.9),
-                  child: Text(
-                    widget.playerName.substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade800,
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 36,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      widget.playerName.substring(0, 1).toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade800,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 20),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,28 +780,45 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
                       Text(
                         widget.playerName,
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 26,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
+                          letterSpacing: 0.5,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         '$totalGamesPlayed games played',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.emoji_events, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$totalWins wins (${winRate.toStringAsFixed(1)}%)',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.emoji_events, color: Colors.amber, size: 16),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$totalWins wins (${winRate.toStringAsFixed(1)}%)',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -811,83 +828,136 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            
+            // Main statistics row
             Container(
-              height: 40,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withOpacity(0.15),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _enhancedStatItem('Avg', avgScore.toStringAsFixed(1), Icons.trending_up, Colors.white),
+                  _enhancedDivider(),
+                  _enhancedStatItem(
+                    'High Checkout', 
+                    '${highestCheckout.toInt()}', 
+                    Icons.star,
+                    Colors.amber
+                  ),
+                  _enhancedDivider(),
+                  _enhancedStatItem(
+                    'Favorite', 
+                    _favoriteCheckout.isEmpty ? 'N/A' : _favoriteCheckout, 
+                    Icons.favorite,
+                    Colors.lightGreenAccent
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Secondary statistics row
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withOpacity(0.1),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _enhancedStatItem('Best Leg', '$bestLegDarts darts', Icons.speed, Colors.greenAccent),
+                  _enhancedDivider(),
+                  _enhancedStatItem('Largest Round', '$_largestRoundScore', Icons.whatshot, Colors.deepOrange),
+                  _enhancedDivider(),
+                  _enhancedStatItem('Largest Bust', '$_largestBustScore', Icons.error_outline, Colors.redAccent),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Recent form indicator
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 color: Colors.white.withOpacity(0.1),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _statItem('Avg', avgScore.toStringAsFixed(1), Colors.white),
-                  _divider(),
-                  _statItem(
-                    'Highest Checkout', 
-                    '${highestCheckout.toInt()}', 
-                    Colors.amber
-                  ),
-                  _divider(),
-                  _statItem(
-                    'Favorite', 
-                    _favoriteCheckout.isEmpty ? 'N/A' : _favoriteCheckout, 
-                    Colors.lightGreenAccent
-                  ),
-                  _divider(),
-                  _statItem('Best Leg', '$bestLegDarts darts', Colors.greenAccent),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Recent Form: ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-                ...recentResults.take(5).map((win) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: win ? Colors.green : Colors.red.withOpacity(0.7),
+                  Text(
+                    'Recent Form: ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                )),
-              ],
+                  const SizedBox(width: 8),
+                  ...recentResults.take(5).map((win) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: win ? Colors.green.shade400 : Colors.red.shade400,
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (win ? Colors.green : Colors.red).withOpacity(0.3),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+                ],
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
+    );  }
 
-  Widget _statItem(String label, String value, Color valueColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+  Widget _enhancedStatItem(String label, String value, IconData icon, Color valueColor) {
+    return Expanded(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.white.withOpacity(0.7),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: valueColor, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: valueColor,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -895,11 +965,21 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     );
   }
 
-  Widget _divider() {
+  Widget _enhancedDivider() {
     return Container(
       width: 1,
-      height: 20,
-      color: Colors.white.withOpacity(0.2),
+      height: 30,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withOpacity(0.0),
+            Colors.white.withOpacity(0.3),
+            Colors.white.withOpacity(0.0),
+          ],
+        ),
+      ),
     );
   }
 
@@ -966,159 +1046,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildAdvancedStatsCards() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8, bottom: 8),
-          child: Text(
-            'Advanced Statistics',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildAdvancedStatRow(
-                  'Favorite Checkout',
-                  _favoriteCheckout.isEmpty 
-                      ? 'None yet' 
-                      : '$_favoriteCheckout ($_favoriteCheckoutCount times)',
-                  Icons.star,
-                  Colors.amber,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Best Day',
-                  _bestDayToPlay,
-                  Icons.calendar_today,
-                  Colors.teal,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Most Hit Number',
-                  '$mostHitNumber ($mostHitCount times)',
-                  Icons.adjust,
-                  Colors.red,
-                ),
-                const Divider(),
-                _buildAdvancedStatRow(
-                  'Improvement Trend',
-                  _improvementRate > 0 
-                      ? '+${_improvementRate.toStringAsFixed(1)}% per game' 
-                      : '${_improvementRate.toStringAsFixed(1)}% per game',
-                  Icons.trending_up,
-                  _improvementRate >= 0 ? Colors.green : Colors.red,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Segment Distribution',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 180,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: PieChart(PieChartData(
-                          sections: [
-                            PieChartSectionData(
-                              value: _countSingles.toDouble(),
-                              color: Colors.blue,
-                              title: 'Singles',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countDoubles.toDouble(),
-                              color: Colors.green,
-                              title: 'Doubles',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countTriples.toDouble(),
-                              color: Colors.red,
-                              title: 'Triples',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                            PieChartSectionData(
-                              value: _countBulls.toDouble(),
-                              color: Colors.orange,
-                              title: 'Bulls',
-                              titleStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              radius: 50,
-                            ),
-                          ],
-                          centerSpaceRadius: 0,
-                          sectionsSpace: 2,
-                        )),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLegendItem('Singles', Colors.blue, _countSingles),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Doubles', Colors.green, _countDoubles),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Triples', Colors.red, _countTriples),
-                          const SizedBox(height: 8),
-                          _buildLegendItem('Bulls', Colors.orange, _countBulls),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  
 
   Widget _buildLegendItem(String label, Color color, int count) {
     final total = _countSingles + _countDoubles + _countTriples + _countBulls;
@@ -1139,80 +1067,72 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
       ],
     );
   }
-
-  Widget _buildAdvancedStatRow(String label, String value, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatCard(String title, String value, IconData icon, Color color, String tooltip) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade700,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(0.05),
+              color.withOpacity(0.1),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
-                ),
-                Tooltip(
-                  message: tooltip,
-                  child: Icon(Icons.info_outline, size: 16, color: Colors.grey.shade400),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(icon, color: color, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                  Tooltip(
+                    message: tooltip,
+                    child: Icon(Icons.info_outline, size: 16, color: Colors.grey.shade400),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1284,15 +1204,27 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 reservedSize: 30,
+                                interval: 1, // Suggest to the chart to consider titles at each integer interval
                                 getTitlesWidget: (value, meta) {
-                                  return SideTitleWidget(
-                                    meta: meta,
-                                    space: 8,
-                                    child: Text(
-                                      'Game ${(value + 1).toInt()}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  );
+                                  // Check if this 'value' (x-coordinate) corresponds to an actual data point
+                                  final isDataPointX = spots.any((spot) => spot.x == value);
+
+                                  if (isDataPointX) {
+                                    // Ensure the value is a valid index for the spots
+                                    // spots are 0-indexed, so game number is value + 1
+                                    if (value >= 0 && value < spots.length) {
+                                      return SideTitleWidget(
+                                        meta: meta,
+                                        space: 8,
+                                        child: Text(
+                                          '${value.toInt() + 1}', // Display 1-indexed game number
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                  // For any other case, or if value is not an x-coordinate of a spot, return an empty widget
+                                  return const SizedBox.shrink();
                                 },
                               ),
                             ),
@@ -1754,122 +1686,96 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
                 ],
               ),
             ),
-          ),
-        ],
+          ),        ],
       ),
     );
   }
 
+  // Build history tab (simple implementation for now)
   Widget _buildHistoryTab() {
-    return ListView(
+    final completedGames = lastGames.where((g) => g['completedAt'] != null).toList();
+    
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Recent Games',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Game History',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (completedGames.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'No completed games yet',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 16),
-                ...lastGames.map((g) {
-                  final date = DateTime.tryParse(g['createdAt'] ?? '') ?? DateTime.now();
-                  final winner = g['winner'];
-                  final completed = g['completedAt'] != null;
-                  final isWin = completed && winner == widget.playerName;
-                  final isLoss = completed && winner != null && winner != widget.playerName;
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: isWin 
-                          ? Colors.green.shade50 
-                          : isLoss 
-                              ? Colors.red.shade50 
-                              : Colors.grey.shade50,
-                      border: Border.all(
-                        color: isWin 
-                            ? Colors.green.shade200 
-                            : isLoss 
-                                ? Colors.red.shade200 
-                                : Colors.grey.shade200,
-                      ),
+              ),
+            )
+          else
+            ...completedGames.take(20).map((g) {
+              final date = DateTime.parse(g['createdAt']);
+              final completed = g['completedAt'] != null;
+              final isWin = g['winner'] == widget.playerName;
+              final winner = g['winner'];
+              final gameMode = g['gameMode'];
+              
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  title: Text(
+                    gameMode == 'Cricket' ? 'Cricket Game' : 'Game Mode: $gameMode',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isWin 
-                            ? Colors.green 
-                            : isLoss 
-                                ? Colors.red 
-                                : Colors.orange,
-                        child: Icon(
-                          isWin 
-                              ? Icons.emoji_events 
-                              : isLoss 
-                                  ? Icons.do_not_disturb 
-                                  : Icons.access_time,
-                          color: Colors.white,
-                          size: 20,
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
                         ),
                       ),
-                      title: Text(
-                        'Game Mode: ${g['gameMode'] ?? ''}',
-                        style: const TextStyle(
+                      const SizedBox(height: 4),
+                      Text(
+                        !completed
+                            ? 'In Progress'
+                            : isWin
+                                ? 'You won!'
+                                : 'Winner: $winner',
+                        style: TextStyle(
+                          color: !completed
+                              ? Colors.orange
+                              : isWin
+                                  ? Colors.green
+                                  : Colors.red,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            !completed
-                                ? 'In Progress'
-                                : isWin
-                                    ? 'You won!'
-                                    : 'Winner: $winner',
-                            style: TextStyle(
-                              color: !completed
-                                  ? Colors.orange
-                                  : isWin
-                                      ? Colors.green
-                                      : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.info_outline),
-                        onPressed: () => _showGameDetailsDialog(g),
-                        tooltip: 'Game Details',
-                      ),
-                      isThreeLine: true,
-                      onTap: () => _showGameDetailsDialog(g),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-      ],
+                    ],
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: () => _showGameDetailsDialog(g),
+                    tooltip: 'Game Details',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 }

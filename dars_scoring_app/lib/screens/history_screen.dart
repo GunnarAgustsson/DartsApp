@@ -4,7 +4,10 @@ import 'package:intl/intl.dart'; // Add this dependency for date formatting
 import 'dart:convert';
 import 'package:collection/collection.dart'; // For grouping
 import 'traditional_game_screen.dart';
-import '../models/game_history.dart';
+import 'cricket_game_screen.dart';
+import 'donkey_game_screen.dart';
+import '../models/unified_game_history.dart';
+import '../models/app_enums.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -14,38 +17,76 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<GameHistory> games = [];
+  List<UnifiedGameHistory> games = [];
   bool isLoading = true;
   
   @override
   void initState() {
     super.initState();
     _loadGames();
-  }
-
-  Future<void> _loadGames() async {
+  }  Future<void> _loadGames() async {
     setState(() => isLoading = true);
     
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList('games_history') ?? [];
+    
+    // Load traditional games
+    final traditionalRaw = prefs.getStringList('games_history') ?? [];
+    debugPrint('Loading traditional games, raw count: ${traditionalRaw.length}');
+    
+    // Load cricket games
+    final cricketRaw = prefs.getStringList('cricket_games') ?? [];
+    debugPrint('Loading cricket games, raw count: ${cricketRaw.length}');
+    
+    // Load donkey games
+    final donkeyRaw = prefs.getStringList('donkey_games') ?? [];
+    debugPrint('Loading donkey games, raw count: ${donkeyRaw.length}');
+    
+    List<UnifiedGameHistory> allGames = [];    // Parse traditional games
+    for (String rawGame in traditionalRaw) {
+      try {
+        final game = UnifiedGameHistory.fromJson(jsonDecode(rawGame));
+        allGames.add(game);
+      } catch (e) {
+        debugPrint('Error parsing traditional game: $e');
+      }
+    }
+    
+    // Parse cricket games
+    for (String rawGame in cricketRaw) {
+      try {
+        final game = UnifiedGameHistory.fromJson(jsonDecode(rawGame));
+        allGames.add(game);
+      } catch (e) {
+        debugPrint('Error parsing cricket game: $e');
+      }
+    }
+    
+    // Parse donkey games
+    for (String rawGame in donkeyRaw) {
+      try {
+        final game = UnifiedGameHistory.fromJson(jsonDecode(rawGame));
+        allGames.add(game);
+      } catch (e) {
+        debugPrint('Error parsing donkey game: $e');
+      }
+    }
     
     setState(() {
-      games = raw
-        .map((e) => GameHistory.fromJson(jsonDecode(e)))
-        .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Most recent first
+      games = allGames..sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Most recent first
       isLoading = false;
+      
+      debugPrint('Parsed ${games.length} total games successfully (${traditionalRaw.length} traditional, ${cricketRaw.length} cricket, ${donkeyRaw.length} donkey)');
     });
   }
 
   // Group games by date (today, yesterday, this week, earlier)
-  Map<String, List<GameHistory>> _getGroupedGames() {
+  Map<String, List<UnifiedGameHistory>> _getGroupedGames() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
     final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
     
-    return groupBy(games, (GameHistory game) {
+    return groupBy(games, (UnifiedGameHistory game) {
       final gameDate = DateTime(
         game.createdAt.year, 
         game.createdAt.month, 
@@ -57,34 +98,63 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (gameDate.isAfter(thisWeekStart)) return 'This Week';
       return 'Earlier';
     });
-  }
-
-  Future<void> _deleteGame(int idx) async {
+  }  Future<void> _deleteGame(int idx) async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String> gamesRaw = prefs.getStringList('games_history') ?? [];
-    
-    // Find the game ID to delete
     final gameToDelete = games[idx];
-    final rawIdx = gamesRaw.indexWhere((raw) {
-      final game = jsonDecode(raw);
-      return game['id'] == gameToDelete.id;
-    });
     
-    if (rawIdx >= 0) {
-      gamesRaw.removeAt(rawIdx);
-      await prefs.setStringList('games_history', gamesRaw);
-      setState(() {
-        games.removeAt(idx);
+    if (gameToDelete.gameType == GameType.cricket) {
+      // Delete from cricket games
+      final List<String> cricketGamesRaw = prefs.getStringList('cricket_games') ?? [];
+      final rawIdx = cricketGamesRaw.indexWhere((raw) {
+        final game = jsonDecode(raw);
+        return game['id'] == gameToDelete.id;
       });
+      
+      if (rawIdx >= 0) {
+        cricketGamesRaw.removeAt(rawIdx);
+        await prefs.setStringList('cricket_games', cricketGamesRaw);
+      }
+    } else if (gameToDelete.gameType == GameType.donkey) {
+      // Delete from donkey games
+      final List<String> donkeyGamesRaw = prefs.getStringList('donkey_games') ?? [];
+      final rawIdx = donkeyGamesRaw.indexWhere((raw) {
+        final game = jsonDecode(raw);
+        return game['id'] == gameToDelete.id;
+      });
+      
+      if (rawIdx >= 0) {
+        donkeyGamesRaw.removeAt(rawIdx);
+        await prefs.setStringList('donkey_games', donkeyGamesRaw);
+      }
+    } else {
+      // Delete from traditional games
+      final List<String> traditionalGamesRaw = prefs.getStringList('games_history') ?? [];
+      final rawIdx = traditionalGamesRaw.indexWhere((raw) {
+        final game = jsonDecode(raw);
+        return game['id'] == gameToDelete.id;
+      });
+      
+      if (rawIdx >= 0) {
+        traditionalGamesRaw.removeAt(rawIdx);
+        await prefs.setStringList('games_history', traditionalGamesRaw);
+      }
     }
-  }
-
-  void _showGameDetailsDialog(GameHistory game) {
-    final wasCompleted = game.completedAt != null;
-    final throws = game.throws;
+    
+    setState(() {
+      games.removeAt(idx);
+    });
+  }void _showGameDetailsDialog(UnifiedGameHistory game) {
+    if (game.gameType != GameType.cricket) {
+      _showTraditionalGameDetails(game.traditionalGame!);
+    } else {
+      _showCricketGameDetails(game.cricketGame!);
+    }
+  }  void _showTraditionalGameDetails(dynamic traditionalGame) {
+    final wasCompleted = traditionalGame.completedAt != null;
+    final throws = traditionalGame.throws as List;
     
     // Group throws by player for a better view
-    final throwsByPlayer = groupBy(throws, (DartThrow t) => t.player);
+    final throwsByPlayer = groupBy(throws, (dartThrow) => dartThrow.player as String);
     
     showDialog(
       context: context,
@@ -107,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${game.gameMode} Game',
+                    '${traditionalGame.gameMode} Game',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
@@ -128,13 +198,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Players: ${game.players.join(", ")}',
+                'Players: ${traditionalGame.players.join(", ")}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.normal,
                 ),
               ),
-              if (wasCompleted && game.winner != null)
+              if (wasCompleted && traditionalGame.winner != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(
@@ -142,7 +212,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       const Icon(Icons.emoji_events, color: Colors.amber),
                       const SizedBox(width: 8),
                       Text(
-                        'Winner: ${game.winner}',
+                        'Winner: ${traditionalGame.winner}',
                         style: const TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
@@ -170,7 +240,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     TabBar(
                       isScrollable: true,
                       tabs: throwsByPlayer.keys.map((player) => 
-                        Tab(text: player)
+                        Tab(text: player.toString())
                       ).toList(),
                     ),
                     const SizedBox(height: 8),
@@ -178,7 +248,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       height: 300,
                       child: TabBarView(
                         children: throwsByPlayer.entries.map((entry) {
-                          final player = entry.key;
                           final playerThrows = entry.value;
                           
                           return ListView.separated(
@@ -186,7 +255,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             separatorBuilder: (_, __) => const Divider(height: 1),
                             itemBuilder: (_, i) {
                               final t = playerThrows[i];
-                              final dartLabel = _getDartLabel(t);
+                              final dartLabel = _getTraditionalDartLabel(t);
                               return ListTile(
                                 dense: true,
                                 title: Text(
@@ -242,18 +311,157 @@ class _HistoryScreenState extends State<HistoryScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-              ),
-              onPressed: () {
+              ),              onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GameScreen(
-                      startingScore: game.gameMode,
-                      players: game.players,
-                      gameHistory: game,
+                _resumeGame(UnifiedGameHistory.fromTraditional(traditionalGame));
+              },
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+  void _showCricketGameDetails(dynamic cricketGame) {
+    final wasCompleted = cricketGame.completedAt != null;
+    final throws = cricketGame.throws as List;
+    
+    // Group throws by player for a better view
+    final throwsByPlayer = groupBy(throws, (dartThrow) => dartThrow.player as String);
+    
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: wasCompleted 
+                ? Colors.green.shade100 
+                : Colors.orange.shade100,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Cricket Game',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
+                  Chip(
+                    label: Text(
+                      wasCompleted ? 'Completed' : 'In Progress',
+                      style: TextStyle(
+                        color: wasCompleted ? Colors.green.shade900 : Colors.orange.shade900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    backgroundColor: wasCompleted 
+                        ? Colors.green.shade50 
+                        : Colors.orange.shade50,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Players: ${cricketGame.players.join(", ")}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              if (wasCompleted && cricketGame.winner != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.emoji_events, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Winner: ${cricketGame.winner}',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: throwsByPlayer.isEmpty
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No throws recorded in this game.'),
+                ))
+            : DefaultTabController(
+                length: throwsByPlayer.length,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TabBar(
+                      isScrollable: true,
+                      tabs: throwsByPlayer.keys.map((player) => 
+                        Tab(text: player.toString())
+                      ).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 300,
+                      child: TabBarView(
+                        children: throwsByPlayer.entries.map((entry) {
+                          final playerThrows = entry.value;
+                          
+                          return ListView.separated(
+                            itemCount: playerThrows.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (_, i) {
+                              final t = playerThrows[i];
+                              final dartLabel = _getCricketDartLabel(t);
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  dartLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),                                subtitle: Text(
+                                  'Value: ${t.value}, Hits: ${t.hits}',
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ),
+        actions: [
+          if (!wasCompleted)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Continue Game'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),              onPressed: () {
+                Navigator.of(context).pop();
+                _resumeGame(UnifiedGameHistory.fromCricket(cricketGame));
               },
             ),
           TextButton(
@@ -265,15 +473,61 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
   
-  String _getDartLabel(DartThrow t) {
-    if (t.value == 0) return 'Miss';
-    if (t.value == 50) return 'Double Bull (50)';
-    if (t.value == 25) return 'Single Bull (25)';
-    if (t.multiplier == 3) return 'Triple ${t.value} (${t.value * 3})';
-    if (t.multiplier == 2) return 'Double ${t.value} (${t.value * 2})';
-    return 'Single ${t.value}';
+  String _getCricketDartLabel(dynamic dartThrow) {
+    final value = dartThrow.value;
+    final multiplier = dartThrow.multiplier;
+    
+    if (value == 0) return 'Miss';
+    if (value == 25) return multiplier == 2 ? 'DB' : 'Bull';
+    if (multiplier == 2) return 'D$value';
+    if (multiplier == 3) return 'T$value';
+    return '$value';
   }
 
+  String _getTraditionalDartLabel(dynamic dartThrow) {
+    final value = dartThrow.value;
+    final multiplier = dartThrow.multiplier;
+    
+    if (value == 0) return 'Miss';
+    if (value == 50) return 'DB'; // Double Bull
+    if (value == 25) return '25'; // Single Bull
+    if (multiplier == 2) return 'D$value';
+    if (multiplier == 3) return 'T$value';
+    return '$value';
+  }
+  void _resumeGame(UnifiedGameHistory game) {
+    if (game.gameType == GameType.cricket) {
+      Navigator.of(context).push(        MaterialPageRoute(
+          builder: (_) => CricketGameScreen(
+            players: game.players,
+            gameHistory: game.cricketGame,
+            variant: CricketVariant.standard, // Default for resumed games
+          ),
+        ),
+      );
+    } else if (game.gameType == GameType.donkey) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DonkeyGameScreen(
+            players: game.donkeyGame!.originalPlayers,
+            gameHistory: game.donkeyGame,
+            randomOrder: false, // Default for resumed games
+            variant: game.donkeyGame!.variant,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GameScreen(
+            startingScore: game.traditionalGame!.gameMode,
+            players: game.players,
+            gameHistory: game.traditionalGame,
+          ),
+        ),
+      );
+    }
+  }
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -364,9 +618,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ? Colors.green.shade700 
                                   : Colors.orange.shade700,
                             ),
-                          ),
-                          title: Text(
-                            '${game.gameMode} Game',
+                          ),                          title: Text(
+                            game.gameTag,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
@@ -416,17 +669,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   if (!wasCompleted)
                                     TextButton.icon(
                                       icon: const Icon(Icons.play_arrow),
-                                      label: const Text('Continue'),
-                                      onPressed: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => GameScreen(
-                                              startingScore: game.gameMode,
-                                              players: game.players,
-                                              gameHistory: game,
-                                            ),
-                                          ),
-                                        );
+                                      label: const Text('Continue'),                                      onPressed: () {
+                                        _resumeGame(game);
                                       },
                                     ),
                                   IconButton(

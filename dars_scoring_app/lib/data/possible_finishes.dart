@@ -7,396 +7,751 @@ enum CheckoutRule {
   openFinish,   // any segment, sum >= remainingScore wins
 }
 
-// ─── Ranking helpers ────────────────────────────────────────────────────────
+// ─── Static Checkout Data ───────────────────────────────────────────────────
 
-// A priority list of ideal double finishes (lower index = more preferred)
-// This order reflects standard preference in competitive darts
-const List<int> _preferredDoubles = [
-  40, 32, 16, 8, 4, 2, 36, 20, 10, 24, 12, 6, 18, 34, 30, 28, 26, 38, 14, 22
-];
+// Note: These lists should contain the best checkouts for a score,
+// potentially using 1, 2, or 3 darts, pre-sorted by preference.
+// The bestCheckouts function will filter based on remainingDarts.
 
-// Parse a segment code into its score
-int _scoreOf(String code) {
-  if (code == 'DB') return 50;
-  if (code == 'SB') return 25;
-  final num = int.parse(code.substring(1));
-  switch (code[0]) {
-    case 'T': return num * 3;
-    case 'D': return num * 2;
-    case 'S': return num;
-    default:  return 0;
-  }
-}
+// Checkouts for Double Out (must finish on a double)
+// Scores like 1, 3, 5, etc., or high scores with no double out (e.g., 169, 168, 166, 165, 163, 162, 159) are omitted.
+const Map<int, List<List<String>>> _doubleOutCheckouts = {
+  170: [['T20', 'T20', 'DB']],
+  167: [['T20', 'T19', 'DB']],
+  164: [['T19', 'T19', 'DB']],
+  161: [['T20', 'T17', 'DB']],
+  160: [['T20', 'T20', 'D20']],
+  158: [['T20', 'T20', 'D19']],
+  157: [['T19', 'T20', 'D20']],
+  156: [['T20', 'T20', 'D18']],
+  155: [['T20', 'T19', 'D19']],
+  154: [['T20', 'T18', 'D20']],
+  153: [['T20', 'T19', 'D18']],
+  152: [['T20', 'T20', 'D16']],
+  151: [['T20', 'T17', 'D20']],
+  150: [['T20', 'T18', 'D18']],
+  149: [['T20', 'T19', 'D16']],
+  148: [['T20', 'T20', 'D14']],
+  147: [['T20', 'T17', 'D18']],
+  146: [['T20', 'T18', 'D16']],
+  145: [['T20', 'T15', 'D20']],
+  144: [['T20', 'T20', 'D12']],
+  143: [['T20', 'T17', 'D16']],
+  142: [['T20', 'T14', 'D20']],
+  141: [['T20', 'T15', 'D18']],
+  140: [['T20', 'T16', 'D16']],
+  139: [['T20', 'T13', 'D20']],
+  138: [['T20', 'T16', 'D15']],
+  137: [['T18', 'T17', 'D16']],
+  136: [['T20', 'T20', 'D8']],
+  135: [['T20', 'T13', 'D18']],
+  134: [['T20', 'T14', 'D16']],
+  133: [['T20', 'T19', 'D8']],
+  132: [['T20', 'T16', 'D12']],
+  131: [['T20', 'T13', 'D16']],
+  130: [['T20', 'T18', 'D8']],
+  129: [['T19', 'T16', 'D12']],
+  128: [['T20', 'T20', 'D4']],
+  127: [['T20', 'T17', 'D8']],
+  126: [['T19', 'T19', 'D6']],
+  125: [['T20', 'T19', 'D4']],
+  124: [['T20', 'T16', 'D8']],  
+  123: [['T20', 'T13', 'D12']],
+  122: [['T20', 'T10', 'D16']],
+  121: [['T20', 'T15', 'D8']],
+  120: [['T20', '20', 'D20']],
+  119: [['T20', '19', 'D20']],
+  118: [['T20', '18', 'D20']],
+  117: [['T20', '17', 'D20']],
+  116: [['T20', '16', 'D20']],
+  115: [['T20', '15', 'D20']],
+  114: [['T20', '14', 'D20']],
+  113: [['T20', '13', 'D20']],
+  112: [['T20', '12', 'D20']],
+  111: [['T20', '19', 'D16']],
+  110: [['T20', 'DB']],
+  109: [['T19', '12', 'D20']],
+  108: [['T20', '16', 'D16']],
+  107: [['T19', 'DB']],
+  106: [['T20', '10', 'D18']],
+  105: [['T20', '13', 'D16']],
+  104: [['T18', 'DB']],
+  103: [['T19', '10', 'D18']],
+  102: [['T20', '10', 'D16']],
+  101: [['T17', 'DB']],
+  100: [['T20', 'D20']],
+  99:  [['T19', '10', 'D16']],
+  98:  [['T20', 'D19']],
+  97:  [['T19', 'D20']],
+  96:  [['T20', 'D18']],
+  95:  [['T19', 'D19']],
+  94:  [['T18', 'D20']],
+  93:  [['T19', 'D18']],
+  92:  [['T20', 'D16']],
+  91:  [['T17', 'D20']],
+  90:  [['T18', 'D18']],
+  89:  [['T19', 'D16']],
+  88:  [['T16', 'D20']],
+  87:  [['T17', 'D18']],
+  86:  [['T18', 'D16']],
+  85:  [['T15', 'D20']],
+  84:  [['T16', 'D18']],
+  83:  [['T17', 'D16']],
+  82:  [['T14', 'D20']],
+  81:  [['T15', 'D18']],
+  80:  [['T16', 'D16']],
+  79:  [['T13', 'D20']],
+  78:  [['T18', 'D12']],
+  77:  [['T15', 'D16']],
+  76:  [['T20', 'D8']],
+  75:  [['T13', 'D18']],
+  74:  [['T14', 'D16']],
+  73:  [['T19', 'D8']],
+  72:  [['T16', 'D12']],
+  71:  [['T13', 'D16']],
+  70:  [['T18', 'D8']],
+  69:  [['T19', 'D6']],
+  68:  [['T20', 'D4']],
+  67:  [['T17', 'D8']],
+  66:  [['T10', 'D18']],
+  65:  [['T19', 'D4']],
+  64:  [['T16', 'D8']],
+  63:  [['T13', 'D12']],
+  62:  [['T10', 'D16']],
+  61:  [['T15', 'D8']],
+  60:  [['20', 'D20']],
+  59:  [['19', 'D20']],
+  58:  [['18', 'D20']],
+  57:  [['17', 'D20']],
+  56:  [['16', 'D20']],
+  55:  [['15', 'D20']],
+  54:  [['14', 'D20']],
+  53:  [['13', 'D20']],
+  52:  [['12', 'D20']],
+  51:  [['19', 'D16']],
+  50:  [['DB']],
+  49:  [['17', 'D16']],
+  48:  [['16', 'D16']],
+  47:  [['15', 'D16']],
+  46:  [['6', 'D20']],
+  45:  [['13', 'D16']],
+  44:  [['12', 'D16']],
+  43:  [['3', 'D20']],
+  42:  [['10', 'D16']],
+  41:  [['9', 'D16']],
+  40:  [['D20']],
+  39:  [['7', 'D16']],
+  38:  [['D19']],
+  37:  [['5', 'D16']],
+  36:  [['D18']],
+  35:  [['3', 'D16']],
+  34:  [['D17']],
+  33:  [['1', 'D16']],
+  32:  [['D16']],
+  31:  [['7', 'D12']],
+  30:  [['D15']],
+  29:  [['5', 'D12']],
+  28:  [['D14']],
+  27:  [['3', 'D12']],
+  26:  [['D13']],
+  25:  [['1', 'D12']],
+  24:  [['D12']],
+  23:  [['7', 'D8']],
+  22:  [['D11']],
+  21:  [['5', 'D8']],
+  20:  [['D10']],
+  19:  [['3', 'D8']],
+  18:  [['D9']],
+  17:  [['1', 'D8']],
+  16:  [['D8']],
+  15:  [['7', 'D4']],
+  14:  [['D7']],
+  13:  [['5', 'D4']],
+  12:  [['D6']],
+  11:  [['3', 'D4']],
+  10:  [['D5']],
+  9:   [['1', 'D4']],
+  8:   [['D4']],
+  7:   [['3', 'D2']],
+  6:   [['D3']],
+  5:   [['1', 'D2']],
+  4:   [['D2']],
+  3:   [['1', 'D1']],
+  2:   [['D1']],
+};
 
-// Collect *all* legal checkout combos up to [remainingDarts]
-List<List<String>> getAllCheckouts(
-  int remainingScore,
-  int remainingDarts,
-  CheckoutRule rule,
-) {  // rebuild the segments list with standard dartboard priorities
-  final segments = <MapEntry<String, int>>[];
-  
-  // For first dart in a sequence, we typically want higher values 
-  // especially triples of high numbers like 20, 19, 18
-  if (remainingDarts >= 2) {
-    // Add T20 first (highest priority for first dart)
-    segments.add(MapEntry('T20', 60));
-    
-    // Then other high-value triples in descending order
-    for (var i = 19; i >= 10; i--) {
-      segments.add(MapEntry('T$i', i * 3));
-    }
-    
-    // Add remaining triples
-    for (var i = 9; i >= 1; i--) {
-      segments.add(MapEntry('T$i', i * 3));
-    }
-    
-    // Then doubles in preferred order
-    for (var i = 20; i >= 1; i--) {
-      segments.add(MapEntry('D$i', i * 2));
-    }
-    
-    // Singles last (except bulls)
-    for (var i = 20; i >= 1; i--) {
-      segments.add(MapEntry('S$i', i));
-    }
-    
-    // Add bulls
-    segments.add(MapEntry('DB', 50));
-    segments.add(MapEntry('25', 25));
-  } else {
-    // For last dart, the order depends on rule
-    // For doubleOut, doubles should be first
-    if (rule == CheckoutRule.doubleOut) {
-      // Add preferred doubles first
-      for (var d in _preferredDoubles) {
-        segments.add(MapEntry('D${d~/2}', d));
-      }
-      
-      // Add any remaining doubles
-      for (var i = 20; i >= 1; i--) {
-        if (!_preferredDoubles.contains(i * 2)) {
-          segments.add(MapEntry('D$i', i * 2));
-        }
-      }
-      
-      // Bull counts as a double
-      segments.add(MapEntry('DB', 50));
-    } else {
-      // For other rules, add all segments
-      for (var i = 20; i >= 1; i--) {
-        segments.add(MapEntry('T$i', i * 3));
-        segments.add(MapEntry('D$i', i * 2));
-        segments.add(MapEntry('S$i', i));
-      }
-      segments.add(MapEntry('DB', 50));
-      segments.add(MapEntry('25', 25));
-    }
-  }
-  segments.sort((a, b) => b.value.compareTo(a.value));
+// Checkouts for Extended Out (must finish on a double or triple, or bull)
+// DB counts as D. Finish priority D > DB > T.
+const Map<int, List<List<String>>> _extendedOutCheckouts = {
+  180: [['T20', 'T20', 'T20']],
+  177: [['T20', 'T19', 'T20']],
+  174: [['T20', 'T18', 'T20']],
+  171: [['T20', 'T17', 'T20']],
+  170: [['T20', 'T20', 'DB']],
+  167: [['T20', 'T19', 'DB']],
+  164: [['T19', 'T19', 'DB']],
+  161: [['T20', 'T17', 'DB']],
+  160: [['T20', 'T20', 'D20']],
+  158: [['T20', 'T20', 'D19']],
+  157: [['T19', 'T20', 'D20']],
+  156: [['T20', 'T20', 'D18']],
+  155: [['T20', 'T19', 'D19']],
+  154: [['T20', 'T18', 'D20']],
+  153: [['T20', 'T19', 'D18']],
+  152: [['T20', 'T20', 'D16']],
+  151: [['T20', 'T17', 'D20']],
+  150: [['T20', 'T18', 'D18']],
+  149: [['T20', 'T19', 'D16']],
+  148: [['T20', 'T20', 'D14']],
+  147: [['T20', 'T17', 'D18']],
+  146: [['T20', 'T18', 'D16']],
+  145: [['T20', 'T15', 'D20']],
+  144: [['T20', 'T20', 'D12']],
+  143: [['T20', 'T17', 'D16']],
+  142: [['T20', 'T14', 'D20']],
+  141: [['T20', 'T15', 'D18']],
+  140: [['T20', 'T16', 'D16']],
+  139: [['T20', 'T13', 'D20']],
+  138: [['T20', 'T16', 'D15']],
+  137: [['T18', 'T17', 'D16']],
+  136: [['T20', 'T20', 'D8']],
+  135: [['T20', 'T13', 'D18']],
+  134: [['T20', 'T14', 'D16']],
+  133: [['T20', 'T19', 'D8']],
+  132: [['T20', 'T16', 'D12']],
+  131: [['T20', 'T13', 'D16']],
+  130: [['T20', 'T18', 'D8']],
+  129: [['T19', 'T16', 'D12']],
+  128: [['T20', 'T20', 'D4']],
+  127: [['T20', 'T17', 'D8']],
+  126: [['T19', 'T19', 'D16']],
+  125: [['T20', 'T19', 'D4']],
+  124: [['T20', 'T16', 'D8']],  
+  123: [['T20', 'T13', 'D12']],
+  122: [['T20', 'T10', 'D16']],
+  121: [['T20', 'T15', 'D8']],
+  120: [['T20', 'T20']],
+  119: [['T20', '19', 'D20']],
+  118: [['T20', '18', 'D20']],
+  117: [['T20', 'T19']],
+  116: [['T20', '16', 'D20']],
+  115: [['T20', '15', 'D20']],
+  114: [['T20', 'T18']],
+  113: [['T20', '13', 'D20']],
+  112: [['T20', '12', 'D20']],
+  111: [['T20', 'T17']],
+  110: [['T20', 'DB']],
+  109: [['T19', '12', 'D20']],
+  108: [['T20', 'T16']],
+  107: [['T19', 'DB']],
+  106: [['T20', '10', 'D18']],
+  105: [['T20', 'T15']],
+  104: [['T18', 'DB']],
+  103: [['T19', '10', 'D18']],
+  102: [['T20', 'T14']],
+  101: [['T17', 'DB']],
+  100: [['T20', 'D20']],
+  99:  [['T19', '10', 'D16']],
+  98:  [['T20', 'D19']],
+  97:  [['T19', 'D20']],
+  96:  [['T20', 'D18']],
+  95:  [['T19', 'D19']],
+  94:  [['T18', 'D20']],
+  93:  [['T19', 'D18']],
+  92:  [['T20', 'D16']],
+  91:  [['T17', 'D20']],
+  90:  [['T18', 'D18']],
+  89:  [['T19', 'D16']],
+  88:  [['T16', 'D20']],
+  87:  [['T17', 'D18']],
+  86:  [['T18', 'D16']],
+  85:  [['T15', 'D20']],
+  84:  [['T16', 'D18']],
+  83:  [['T17', 'D16']],
+  82:  [['T14', 'D20']],
+  81:  [['T15', 'D18']],
+  80:  [['T16', 'D16']],
+  79:  [['T13', 'D20']],
+  78:  [['T18', 'D12']],
+  77:  [['T15', 'D16']],
+  76:  [['T20', 'D8']],
+  75:  [['T13', 'D18']],
+  74:  [['T14', 'D16']],
+  73:  [['T19', 'D8']],
+  72:  [['T16', 'D12']],
+  71:  [['T13', 'D16']],
+  70:  [['T18', 'D8']],
+  69:  [['T19', 'D6']],
+  68:  [['T20', 'D4']],
+  67:  [['T17', 'D8']],
+  66:  [['T10', 'D18']],
+  65:  [['T19', 'D4']],
+  64:  [['T16', 'D8']],
+  63:  [['T13', 'D12']],
+  62:  [['T10', 'D16']],
+  61:  [['T15', 'D8']],
+  60:  [['T20']],
+  59:  [['19', 'D20']],
+  58:  [['18', 'D20']],
+  57:  [['T19']],
+  56:  [['16', 'D20']],
+  55:  [['15', 'D20']],
+  54:  [['T18']],
+  53:  [['13', 'D20']],
+  52:  [['12', 'D20']],
+  51:  [['T17']],
+  50:  [['DB']],
+  49:  [['17', 'D16']],
+  48:  [['T16']],
+  47:  [['15', 'D16']],
+  46:  [['6', 'D20']],
+  45:  [['T15']],
+  44:  [['12', 'D16']],
+  43:  [['3', 'D20']],
+  42:  [['T14']],
+  41:  [['9', 'D16']],
+  40:  [['D20']],
+  39:  [['T13']],
+  38:  [['D19']],
+  37:  [['5', 'D16']],
+  36:  [['D18']],
+  35:  [['3', 'D16']],
+  34:  [['D17']],
+  33:  [['T11']],
+  32:  [['D16']],
+  31:  [['7', 'D12']],
+  30:  [['D15']],
+  29:  [['5', 'D12']],
+  28:  [['D14']],
+  27:  [['T9']],
+  26:  [['D13']],
+  25:  [['1', 'D12']],
+  24:  [['D12']],
+  23:  [['7', 'D8']],
+  22:  [['D11']],
+  21:  [['T7']],
+  20:  [['D10']],
+  19:  [['3', 'D8']],
+  18:  [['D9']],
+  17:  [['1', 'D8']],
+  16:  [['D8']],
+  15:  [['T5']],
+  14:  [['D7']],
+  13:  [['5', 'D4']],
+  12:  [['D6']],
+  11:  [['3', 'D4']],
+  10:  [['D5']],
+  9:   [['T3']],
+  8:   [['D4']],
+  7:   [['3', 'D2']],
+  6:   [['D3']],
+  5:   [['1', 'D2']],
+  4:   [['D2']],
+  3:   [['T3']],
+  2:   [['D1']],
+};
 
-  bool validLast(MapEntry<String,int> seg, int total) {
-    switch (rule) {
-      case CheckoutRule.openFinish:
-        return total >= remainingScore;
-      case CheckoutRule.exactOut:
-        return total == remainingScore;
-      case CheckoutRule.doubleOut:
-        // must finish on a double; treat DB (bull) as a valid double always
-        if (total == remainingScore
-            && (seg.key.startsWith('D') || seg.key == 'DB')) {
-          return true;
-        }
-        return false;
-      case CheckoutRule.extendedOut:
-        return total == remainingScore
-            && (seg.key.startsWith('D') || seg.key.startsWith('T'));
-    }
-  }
+// Checkouts for Exact Out (exact zero, any segment)
+// Priority for last dart (if multiple options for same #darts): S > D > Bull > T
+const Map<int, List<List<String>>> _exactOutCheckouts = {
+  180: [['T20', 'T20', 'T20']],
+  177: [['T20', 'T19', 'T20']],
+  174: [['T20', 'T18', 'T20']],
+  171: [['T20', 'T17', 'T20']],
+  170: [['T20', 'T20', 'DB']],
+  167: [['T20', 'T19', 'DB']],
+  164: [['T19', 'T19', 'DB']],
+  161: [['T20', 'T17', 'DB']],
+  160: [['T20', 'T20', 'D20']],
+  158: [['T20', 'T20', 'D19']],
+  157: [['T19', 'T20', 'D20']],
+  156: [['T20', 'T20', 'D18']],
+  155: [['T20', 'T19', 'D19']],
+  154: [['T20', 'T18', 'D20']],
+  153: [['T20', 'T19', 'D18']],
+  152: [['T20', 'T20', 'D16']],
+  151: [['T20', 'T17', 'D20']],
+  150: [['T20', 'T18', 'D18']],
+  149: [['T20', 'T19', 'D16']],
+  148: [['T20', 'T20', 'D14']],
+  147: [['T20', 'T17', 'D18']],
+  146: [['T20', 'T18', 'D16']],
+  145: [['T20', 'T15', 'D20']],
+  144: [['T20', 'T20', 'D12']],
+  143: [['T20', 'T17', 'D16']],
+  142: [['T20', 'T14', 'D20']],
+  141: [['T20', 'T15', 'D18']],
+  140: [['T20', 'T16', 'D16']],
+  139: [['T20', 'T13', 'D20']],
+  138: [['T20', 'T16', 'D15']],
+  137: [['T18', 'T17', 'D16']],
+  136: [['T20', 'T20', 'D8']],
+  135: [['T20', 'T13', 'D18']],
+  134: [['T20', 'T14', 'D16']],
+  133: [['T20', 'T19', 'D8']],
+  132: [['T20', 'T16', 'D12']],
+  131: [['T20', 'T13', 'D16']],
+  130: [['T20', 'T18', 'D8']],
+  129: [['T19', 'T16', 'D12']],
+  128: [['T20', 'T20', 'D4']],
+  127: [['T20', 'T17', 'D8']],
+  126: [['T19', 'T20', '9']],
+  125: [['T20', 'T19', 'D4']],
+  124: [['T20', 'T16', 'D8']],
+  123: [['T20', 'T13', 'D12']],
+  122: [['T18', 'T20', '5']],
+  121: [['T19', 'T20', '4']],
+  120: [['T20', 'T20']],
+  119: [['T20', 'D20', '19']],
+  118: [['T20', 'D20', '18']],
+  117: [['T20', 'T19']],
+  116: [['T20', 'D20', '16']],
+  115: [['T20', 'D20', '15']],
+  114: [['T20', 'T18']],
+  113: [['T20', 'D20', '13']],
+  112: [['T20', 'D20', '12']],
+  111: [['T20', 'T17']],
+  110: [['T20', 'DB']],
+  109: [['T19', 'D20', '12']],
+  108: [['T20', 'T16']],
+  107: [['T19', 'DB']],
+  106: [['T20', 'D18', '10']],
+  105: [['T20', 'T15']],
+  104: [['T18', 'DB']],
+  103: [['T19', 'D18', '10']],
+  102: [['T20', 'T14']],
+  101: [['T17', 'DB']],
+  100: [['T20', 'D20']],
+  99:  [['T19', 'D16', '10']],
+  98:  [['T20', 'D19']],
+  97:  [['T19', 'D20']],
+  96:  [['T20', 'D18']],
+  95:  [['T19', 'D19']],
+  94:  [['T18', 'D20']],
+  93:  [['T19', 'D18']],
+  92:  [['T20', 'D16']],
+  91:  [['T17', 'D20']],
+  90:  [['T18', 'D18']],
+  89:  [['T19', 'D16']],
+  88:  [['T16', 'D20']],
+  87:  [['T17', 'D18']],
+  86:  [['T18', 'D16']],
+  85:  [['T15', 'D20']],
+  84:  [['T16', 'D18']],
+  83:  [['T17', 'D16']],
+  82:  [['T14', 'D20']],
+  81:  [['T15', 'D18']],
+  80:  [['T20', '20']],
+  79:  [['T20', '19']],
+  78:  [['T20', '18']],
+  77:  [['T20', '17']],
+  76:  [['T20', '16']],
+  75:  [['T20', '15']],
+  74:  [['T20', '14']],
+  73:  [['T20', '13']],
+  72:  [['T20', '12']],
+  71:  [['T20', '11']],
+  70:  [['T20', '10']],
+  69:  [['T20', '9']],
+  68:  [['T20', '8']],
+  67:  [['T20', '7']],
+  66:  [['T20', '6']],
+  65:  [['T20', '5']],
+  64:  [['T20', '4']],
+  63:  [['T20', '3']],
+  62:  [['T20', '2']],
+  61:  [['T20', '1']],
+  60:  [['T20']],
+  59:  [['D20', '19']],
+  58:  [['D20', '18']],
+  57:  [['T19']],
+  56:  [['D20', '16']],
+  55:  [['D20', '15']],
+  54:  [['T18']],
+  53:  [['D20', '13']],
+  52:  [['D20', '12']],
+  51:  [['T17']],
+  50:  [['DB']],
+  49:  [['D16', '17']],
+  48:  [['T16']],
+  47:  [['D16', '15']],
+  46:  [['D20', '6']],
+  45:  [['T15']],
+  44:  [['D16', '12']],
+  43:  [['D20', '3']],
+  42:  [['T14']],
+  41:  [['D16', '9']],
+  40:  [['D20']],
+  39:  [['T13']],
+  38:  [['D19']],
+  37:  [['D16', '5']],
+  36:  [['D18']],
+  35:  [['D16', '3']],
+  34:  [['D17']],
+  33:  [['T11']],
+  32:  [['D16']],
+  31:  [['D12', '7']],
+  30:  [['D15']],
+  29:  [['D12', '5']],
+  28:  [['D14']],
+  27:  [['T9']],
+  26:  [['D13']],
+  25:  [['25']],
+  24:  [['D12']],
+  23:  [['D8', '7']],
+  22:  [['D11']],
+  21:  [['T7']],
+  20:  [['20']],
+  19:  [['19']],
+  18:  [['18']],
+  17:  [['17']],
+  16:  [['16']],
+  15:  [['15']],
+  14:  [['14']],
+  13:  [['13']],
+  12:  [['12']],
+  11:  [['11']],
+  10:  [['10']],
+  9:   [['9']],
+  8:   [['8']],
+  7:   [['7']],
+  6:   [['6']],
+  5:   [['5']],
+  4:   [['4']],
+  3:   [['3']],
+  2:   [['2']],
+  1:   [['1']],
+};
 
-  final results = <List<String>>[];
-  if (remainingDarts >= 1) {
-    for (var s1 in segments) {
-      if (validLast(s1, s1.value)) results.add([s1.key]);
-    }
-  }
-  if (remainingDarts >= 2) {
-    for (var s1 in segments) {
-      for (var s2 in segments) {
-        final sum2 = s1.value + s2.value;
-        if (validLast(s2, sum2)) results.add([s1.key, s2.key]);
-      }
-    }
-  }
-  if (remainingDarts >= 3) {
-    for (var s1 in segments) {
-      for (var s2 in segments) {
-        for (var s3 in segments) {
-          final sum3 = s1.value + s2.value + s3.value;
-          if (validLast(s3, sum3)) results.add([s1.key, s2.key, s3.key]);
-        }
-      }
-    }
-  }
-  return results;
-}
+// Checkouts for Open Finish (any segment, sum >= remainingScore wins)
+// Prioritizes exact finishes. For exact, simpler types (S > D > Bull > T).
+// If overshooting, prefers closest to target.
+const Map<int, List<List<String>>> _openFinishCheckouts = {
+  180: [['T20', 'T20', 'T20']],
+  179: [['T20', 'T20', 'T20']],
+  178: [['T20', 'T20', 'T20']],
+  177: [['T20', 'T20', 'T20']],
+  176: [['T20', 'T20', 'T20']],
+  175: [['T20', 'T20', 'T20']],
+  174: [['T20', 'T20', 'T20']],
+  173: [['T20', 'T20', 'T20']],
+  172: [['T20', 'T20', 'T20']],
+  171: [['T20', 'T20', 'T20']],
+  170: [['T20', 'T20', 'T20']],
+  169: [['T20', 'T20', 'T20']],
+  168: [['T20', 'T20', 'T20']],
+  167: [['T20', 'T20', 'T20']],
+  166: [['T20', 'T20', 'T20']],
+  165: [['T20', 'T20', 'T20']],
+  164: [['T20', 'T20', 'T20']],
+  163: [['T20', 'T20', 'T20']],
+  162: [['T20', 'T20', 'T20']],
+  161: [['T20', 'T20', 'T20']],
+  160: [['T20', 'T20', 'D20']],
+  159: [['T20', 'T20', 'D20']],
+  158: [['T20', 'T20', 'D20']],
+  157: [['T20', 'T20', 'D20']],
+  156: [['T20', 'T20', 'D20']],
+  155: [['T20', 'T20', 'D20']],
+  154: [['T20', 'T20', 'D20']],
+  153: [['T20', 'T20', 'D20']],
+  152: [['T20', 'T20', 'D20']],
+  151: [['T20', 'T20', 'D20']],
+  150: [['T20', 'T20', 'D20']],
+  149: [['T20', 'T20', 'D20']],
+  148: [['T20', 'T20', 'D20']],
+  147: [['T20', 'T20', 'D20']],
+  146: [['T20', 'T20', 'D20']],
+  145: [['T20', 'T20', 'D20']],
+  144: [['T20', 'T20', 'D20']],
+  143: [['T20', 'T20', 'D20']],
+  142: [['T20', 'T20', 'D20']],
+  141: [['T20', 'T20', 'D20']],
+  140: [['T20', 'T20', '20']],
+  139: [['T20', 'T20', '20']],
+  138: [['T20', 'T20', '20']],
+  137: [['T20', 'T20', '20']],
+  136: [['T20', 'T20', '20']],
+  135: [['T20', 'T20', '20']],
+  134: [['T20', 'T20', '20']],
+  133: [['T20', 'T20', '20']],
+  132: [['T20', 'T20', '20']],
+  131: [['T20', 'T20', '20']],
+  130: [['T20', 'T20', '20']],
+  129: [['T20', 'T20', '20']],
+  128: [['T20', 'T20', '20']],
+  127: [['T20', 'T20', '20']],
+  126: [['T20', 'T20', '20']],
+  125: [['T20', 'T20', '20']],
+  124: [['T20', 'T20', '20']],
+  123: [['T20', 'T20', '20']],
+  122: [['T20', 'T20', '20']],
+  121: [['T20', 'T20', '20']],
+  120: [['T20', 'T20']],
+  119: [['T20', 'T20']],
+  118: [['T20', 'T20']],
+  117: [['T20', 'T20']],
+  116: [['T20', 'T20']],
+  115: [['T20', 'T20']],
+  114: [['T20', 'T20']],
+  113: [['T20', 'T20']],
+  112: [['T20', 'T20']],
+  111: [['T20', 'T20']],
+  110: [['T20', 'T20']],
+  109: [['T20', 'T20']],
+  108: [['T20', 'T20']],
+  107: [['T20', 'T20']],
+  106: [['T20', 'T20']],
+  105: [['T20', 'T20']],
+  104: [['T20', 'T20']],
+  103: [['T20', 'T20']],
+  102: [['T20', 'T20']],
+  101: [['T20', 'T20']],
+  100: [['T20', 'D20']],
+  99:  [['T20', 'D20']],
+  98:  [['T20', 'D20']],
+  97:  [['T20', 'D20']],
+  96:  [['T20', 'D20']],
+  95:  [['T20', 'D20']],
+  94:  [['T20', 'D20']],
+  93:  [['T20', 'D20']],
+  92:  [['T20', 'D20']],
+  91:  [['T20', 'D20']],
+  90:  [['T20', 'D20']],
+  89:  [['T20', 'D20']],
+  88:  [['T20', 'D20']],
+  87:  [['T20', 'D20']],
+  86:  [['T20', 'D20']],
+  85:  [['T20', 'D20']],
+  84:  [['T20', 'D20']],
+  83:  [['T20', 'D20']],
+  82:  [['T20', 'D20']],
+  81:  [['T20', 'D20']],
+  80:  [['T20', '20']],
+  79:  [['T20', '20']],
+  78:  [['T20', '20']],
+  77:  [['T20', '20']],
+  76:  [['T20', '20']],
+  75:  [['T20', '20']],
+  74:  [['T20', '20']],
+  73:  [['T20', '20']],
+  72:  [['T20', '20']],
+  71:  [['T20', '20']],
+  70:  [['T20', '20']],
+  69:  [['T20', '20']],
+  68:  [['T20', '20']],
+  67:  [['T20', '20']],
+  66:  [['T20', '20']],
+  65:  [['T20', '20']],
+  64:  [['T20', '20']],
+  63:  [['T20', '20']],
+  62:  [['T20', '20']],
+  61:  [['T20', '20']],
+  60:  [['T20']],
+  59:  [['T20']],
+  58:  [['T20']],
+  57:  [['T20']],
+  56:  [['T20']],
+  55:  [['T20']],
+  54:  [['T20']],
+  53:  [['T20']],
+  52:  [['T20']],
+  51:  [['T20']],
+  50:  [['T20']],
+  49:  [['T20']],
+  48:  [['T20']],
+  47:  [['T20']],
+  46:  [['T20']],
+  45:  [['T20']],
+  44:  [['T20']],
+  43:  [['T20']],
+  42:  [['T20']],
+  41:  [['T20']],
+  40:  [['D20']],
+  39:  [['D20']],
+  38:  [['D20']],
+  37:  [['D20']],
+  36:  [['D20']],
+  35:  [['D20']],
+  34:  [['D20']],
+  33:  [['D20']],
+  32:  [['D20']],
+  31:  [['D20']],
+  30:  [['D20']],
+  29:  [['D20']],
+  28:  [['D20']],
+  27:  [['D20']],
+  26:  [['D20']],
+  25:  [['D20']],
+  24:  [['D20']],
+  23:  [['D20']],
+  22:  [['D20']],
+  21:  [['D20']],
+  20:  [['20']],
+  19:  [['20']],
+  18:  [['20']],
+  17:  [['20']],
+  16:  [['20']],
+  15:  [['20']],
+  14:  [['20']],
+  13:  [['20']],
+  12:  [['20']],
+  11:  [['20']],
+  10:  [['20']],
+  9:   [['20']],
+  8:   [['20']],
+  7:   [['20']],
+  6:   [['20']],
+  5:   [['20']],
+  4:   [['20']],
+  3:   [['20']],
+  2:   [['20']],
+  1:   [['20']],
+};
 
-// Sort by (1) fewer darts, (2) preferred double finish, (3) more trebles
-List<List<String>> rankCheckouts(List<List<String>> combos) {
-  combos.sort((a, b) {
-    // 1) Fewer darts first
-    if (a.length != b.length) {
-      return a.length.compareTo(b.length);
-    }
 
-    // 2) Preferred last‐dart double order
-    final va = _scoreOf(a.last), vb = _scoreOf(b.last);
-    final ia = _preferredDoubles.indexOf(va);
-    final ib = _preferredDoubles.indexOf(vb);
-    final pa = ia >= 0 ? ia : _preferredDoubles.length;
-    final pb = ib >= 0 ? ib : _preferredDoubles.length;
-    final d = pa.compareTo(pb);
-    if (d != 0) {
-      return d;
-    }
+// ─── New bestCheckouts function ─────────────────────────────────────────────
 
-    // 3) More trebles is better
-    final ta = a.where((seg) => seg.startsWith('T')).length;
-    final tb = b.where((seg) => seg.startsWith('T')).length;
-    return tb.compareTo(ta);
-  });
-  return combos;
-}
-
-/// Returns the top [limit] checkout sequences (default 1), or `[]` if none.
-/// Always picks the shortest possible finishes only.
+/// Returns the top [limit] checkout sequences, or `[]` if none.
+/// Looks up checkouts from pre-defined static lists.
 List<List<String>> bestCheckouts(
   int remainingScore,
   int remainingDarts,
   CheckoutRule rule, {
   int limit = 1,
 }) {
-  for (var darts = 1; darts <= remainingDarts; darts++) {
-    final combos = getAllCheckouts(remainingScore, darts, rule);
-    if (combos.isEmpty) continue;
+  Map<int, List<List<String>>> selectedCheckoutMap;
 
-    combos.sort((a, b) {
-      // 1) fewer darts
-      if (a.length != b.length) {
-        return a.length.compareTo(b.length);
-      }
-
-      // 2) rule‐specific priority
-      if (rule == CheckoutRule.exactOut) {
-        // segment‐type priority: T < Bull < D < Single
-        int typePriority(String code) {
-          if (code.startsWith('T')) return 0;
-          if (code == 'DB' || code == '25') return 1;
-          if (code.startsWith('D')) return 2;
-          return 3; // all other 'S' (singles)
-        }
-
-        // last‐dart type
-        final la = typePriority(a.last);
-        final lb = typePriority(b.last);
-        if (la != lb) return lb.compareTo(la);
-
-        // first‐dart type
-        final fa = typePriority(a[0]);
-        final fb = typePriority(b[0]);
-        if (fa != fb) return fb.compareTo(fa);
-
-        // tie‐break by first‐dart value
-        final va = _scoreOf(a[0]);
-        final vb = _scoreOf(b[0]);
-        return vb.compareTo(va);
-      }
-
-      if (rule == CheckoutRule.extendedOut) {
-        // must finish on D or T (including DB) but prefer pure doubles > DB > trebles
-        int finishPriority(String code) {
-          if (code.startsWith('D') && code != 'DB') return 0; // normal doubles
-          if (code == 'DB') return 1;                       // double bull
-          if (code.startsWith('T')) return 2;                // trebles
-          return 3;                                          // should not happen
-        }
-
-        final pa = finishPriority(a.last), pb = finishPriority(b.last);
-        if (pa != pb) return pa.compareTo(pb);
-
-        // same finish‐type, prefer higher‐value finish dart
-        final la = _scoreOf(a.last), lb = _scoreOf(b.last);
-        if (la != lb) return lb.compareTo(la);
-
-        // tie-break: higher first-dart score
-        final fa = _scoreOf(a[0]), fb = _scoreOf(b[0]);
-        return fb.compareTo(fa);
-      }      if (rule == CheckoutRule.openFinish) {
-        // For openFinish, prioritize combinations that are closest to the score
-        int totalA = a.fold(0, (sum, s) => sum + _scoreOf(s));
-        int totalB = b.fold(0, (sum, s) => sum + _scoreOf(s));
-        
-        // First compare based on how close the total is to the remainingScore
-        if (totalA != totalB) {
-          // We want the score that's just over or exactly at the target
-          if (totalA >= remainingScore && totalB >= remainingScore) {
-            // Both are over, pick the one that's closer to the score
-            return totalA.compareTo(totalB);
-          } else {
-            // At least one is under - prefer the higher one
-            return totalB.compareTo(totalA);
-          }
-        }
-        
-        // If totals are the same, prefer more trebles
-        final ta = a.where((s) => s.startsWith('T')).length;
-        final tb = b.where((s) => s.startsWith('T')).length;
-        return tb.compareTo(ta);
-      }
-      
-      // doubleOut logic - prioritize standard checkout paths
-      if (rule == CheckoutRule.doubleOut) {
-        // 1. First check if this is a standard checkout for common numbers
-        final int totalA = a.fold(0, (sum, s) => sum + _scoreOf(s));
-        final int totalB = b.fold(0, (sum, s) => sum + _scoreOf(s));
-        
-        // Common checkout paths that should be preferred
-        final Map<int, List<String>> standardCheckouts = {
-          170: ['T20', 'T20', 'DB'],
-          167: ['T20', 'T19', 'DB'],
-          164: ['T20', 'T18', 'DB'],
-          161: ['T20', 'T17', 'DB'],
-          160: ['T20', 'T20', 'D20'],
-          // ... more standard checkouts ...
-          121: ['T20', 'S11', 'DB'],
-          120: ['T20', 'D20'],
-          119: ['T19', 'S12', 'D20'],
-          118: ['T20', 'D19'],
-          117: ['T19', 'D20'],
-          116: ['T20', 'D18'],
-          115: ['T19', 'D19'],
-          114: ['T20', 'D17'],
-          113: ['T19', 'D18'],
-          112: ['T20', 'D16'],
-          111: ['T19', 'D17'],
-          110: ['T20', 'DB'],
-          107: ['T19', 'DB'],
-          104: ['T18', 'DB'],
-          101: ['T17', 'DB'],
-          100: ['T20', 'D20'],
-          99: ['T19', 'D21'],
-          98: ['T20', 'D19'],
-          97: ['T19', 'D20'],
-          96: ['T20', 'D18'],
-          95: ['T19', 'D19'],
-          94: ['T18', 'D20'],
-          93: ['T19', 'D18'],
-          92: ['T20', 'D16'],
-          91: ['T17', 'D20'],
-          90: ['T20', 'D15'],
-          89: ['T19', 'D16'],
-          86: ['T18', 'D16'],
-          85: ['T15', 'D20'],
-          84: ['T20', 'D12'],
-          83: ['T17', 'D16'],
-          82: ['T14', 'D20'],
-          81: ['T19', 'D12'],
-          80: ['T20', 'D10'],
-          79: ['T19', 'D11'],
-          78: ['T18', 'D12'],
-          77: ['T19', 'D10'],
-          76: ['T20', 'D8'],
-          75: ['T17', 'D12'],
-          74: ['T14', 'D16'],
-          73: ['T19', 'D8'],
-          72: ['T16', 'D12'],
-          71: ['T13', 'D16'],
-          70: ['T18', 'D8'],
-          69: ['T19', 'D6'],
-          68: ['T20', 'D4'],
-          67: ['T17', 'D8'],
-          66: ['T14', 'D12'],
-          65: ['T19', 'D4'],
-          64: ['T16', 'D8'],
-          63: ['T17', 'D6'],
-          62: ['T10', 'D16'],
-          61: ['T15', 'D8'],
-          60: ['D20', 'D20'],
-          58: ['D19', 'D20'],
-          56: ['T16', 'D4'],
-          54: ['T14', 'D6'],
-          52: ['T12', 'D8'],
-          50: ['DB'],
-          40: ['D20'],
-          38: ['D19'],
-          36: ['D18'],
-          34: ['D17'],
-          32: ['D16'],
-          30: ['D15'],
-          28: ['D14'],
-          26: ['D13'],
-          24: ['D12'],
-          22: ['D11'],
-          20: ['D10'],
-          18: ['D9'],
-          16: ['D8'],
-          14: ['D7'],
-          12: ['D6'],
-          10: ['D5'],
-          8: ['D4'],
-          6: ['D3'],
-          4: ['D2'],
-          2: ['D1'],
-        };
-        
-        // 2. Check if a standard checkout exists and use it if found
-        if (standardCheckouts.containsKey(totalA) && 
-            a.join(' ') == standardCheckouts[totalA]!.join(' ')) {
-          return -1;
-        }
-        if (standardCheckouts.containsKey(totalB) && 
-            b.join(' ') == standardCheckouts[totalB]!.join(' ')) {
-          return 1;
-        }
-        
-        // 3. For shots that don't have a standard pattern listed above
-        
-        // Prefer paths with the highest scoring first dart
-        if (a.isNotEmpty && b.isNotEmpty) {
-          final firstDartValueA = _scoreOf(a[0]);
-          final firstDartValueB = _scoreOf(b[0]);
-          
-          // T20 is the most preferred first dart in double-out
-          if (a[0] == 'T20' && b[0] != 'T20') return -1;
-          if (a[0] != 'T20' && b[0] == 'T20') return 1;
-          
-          if (firstDartValueA != firstDartValueB) {
-            return firstDartValueB.compareTo(firstDartValueA);
-          }
-        }
-        
-        // Then check for preferred doubles at the end
-        final va = _scoreOf(a.last), vb = _scoreOf(b.last);
-        final ia = _preferredDoubles.indexOf(va);
-        final ib = _preferredDoubles.indexOf(vb);
-        final pa = ia >= 0 ? ia : _preferredDoubles.length;
-        final pb = ib >= 0 ? ib : _preferredDoubles.length;
-        if (pa != pb) return pa.compareTo(pb);
-        
-        // Lastly prefer paths with more trebles
-        final ta = a.where((s) => s.startsWith('T')).length;
-        final tb = b.where((s) => s.startsWith('T')).length;
-        return tb.compareTo(ta);
-      }
-      
-      // Default sorting logic for other cases
-      int trebleCountA = a.where((s) => s.startsWith('T')).length;
-      int trebleCountB = b.where((s) => s.startsWith('T')).length;
-      return trebleCountB.compareTo(trebleCountA);
-    });
-
-    return combos.take(limit).toList();
+  switch (rule) {
+    case CheckoutRule.doubleOut:
+      selectedCheckoutMap = _doubleOutCheckouts;
+      break;
+    case CheckoutRule.extendedOut:
+      selectedCheckoutMap = _extendedOutCheckouts;
+      break;
+    case CheckoutRule.exactOut:
+      selectedCheckoutMap = _exactOutCheckouts;
+      break;
+    case CheckoutRule.openFinish:
+      selectedCheckoutMap = _openFinishCheckouts;
+      break;
+    // No default needed as CheckoutRule is exhaustive.
   }
-  return <List<String>>[];
+
+  // Use .[]? for a nullable lookup, then provide an empty list if null.
+  List<List<String>> checkoutsForScore = selectedCheckoutMap[remainingScore] ?? [];
+
+  if (checkoutsForScore.isEmpty) {
+    return []; // No pre-defined checkout found for this score under this rule
+  }
+
+  // Filter checkouts based on the number of darts the player has remaining
+  final validCheckouts = checkoutsForScore
+      .where((checkoutSequence) => checkoutSequence.length <= remainingDarts)
+      .toList();
+
+  // The static lists should ideally be pre-sorted by preference.
+  // If not pre-sorted, you might need to add sorting logic here based on rule-specific preferences.
+  // For now, assuming pre-sorted lists.
+  return validCheckouts.take(limit).toList();
 }

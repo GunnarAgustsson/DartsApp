@@ -1,75 +1,173 @@
 import 'package:flutter/material.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
+import 'package:dars_scoring_app/theme/index.dart';
 
+/// Defines different size variants for the overlay
+enum OverlaySize { small, medium, large }
+
+/// A widget that shows animated overlays for bust and turn changes
 class OverlayAnimation extends StatelessWidget {
+  /// Whether to show the bust overlay
   final bool showBust;
+    /// Whether to show the turn change overlay
   final bool showTurnChange;
-  final Color bgColor;
+    /// Whether to show the letter received overlay
+  final bool showLetterReceived;
+  
+  /// Whether to show the player eliminated overlay
+  final bool showPlayerEliminated;
+  
+  /// Background color for the overlay
+  final Color? bgColor;
+  
+  /// Points scored in the last turn
   final String lastTurnPoints;
+  
+  /// Labels for darts thrown in the last turn
   final String lastTurnLabels;
+  
+  /// Name of the next player
   final String nextPlayerName;
-  final double bustFontSize;
-  final double turnNameFontSize;
-  final double turnTextFontSize;
 
-  const OverlayAnimation({
+  /// Player who received a letter
+  final String letterReceivedPlayer;
+  
+  /// Letters the player now has
+  final String letterReceivedLetters;
+
+  /// Size variant for the overlay
+  final OverlaySize size;
+
+  /// Animation duration for this overlay
+  final Duration animationDuration;  const OverlayAnimation({
     super.key,
     required this.showBust,
     required this.showTurnChange,
-    required this.bgColor,
+    this.showLetterReceived = false,
+    this.showPlayerEliminated = false,
+    this.bgColor,
     required this.lastTurnPoints,
     required this.lastTurnLabels,
     required this.nextPlayerName,
-    required this.bustFontSize,
-    required this.turnNameFontSize,
-    required this.turnTextFontSize,
-  });
-
-  @override
+    this.letterReceivedPlayer = '',
+    this.letterReceivedLetters = '',
+    this.size = OverlaySize.large,
+    this.animationDuration = const Duration(milliseconds: 300),
+  });@override
   Widget build(BuildContext context) {
+    // Calculate font sizes based on size variant
+    double bustFontSize = 72;
+    double turnNameFontSize = 36;
+    double turnTextFontSize = 28;
+    
+    switch (size) {
+      case OverlaySize.small:
+        bustFontSize = 48;
+        turnNameFontSize = 24;
+        turnTextFontSize = 18;
+        break;
+      case OverlaySize.medium:
+        bustFontSize = 64;
+        turnNameFontSize = 32;
+        turnTextFontSize = 24;
+        break;
+      case OverlaySize.large:
+        bustFontSize = 72;
+        turnNameFontSize = 36;
+        turnTextFontSize = 28;
+        break;
+    }      // Use theme colors if bgColor not provided
+    final backgroundColor = bgColor ?? (showBust 
+        ? AppColors.bustOverlayRed 
+        : (showLetterReceived || showPlayerEliminated)
+            ? AppColors.bustOverlayRed  // Red for letter received and elimination
+            : AppColors.turnChangeBlue);
+    
     return Container(
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16 * (bustFontSize / 72)),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
       ),
-      child: Center(
-        child: showBust
-            ? Text(
-                'BUST',
-                style: TextStyle(
+      padding: const EdgeInsets.all(AppDimensions.paddingL),
+      child: Center(      child: showBust
+            ? Text('BUST',
+                style: AppTextStyles.bustOverlay().copyWith(
                   fontSize: bustFontSize,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  letterSpacing: 4,
-                ),
-              )
-            : showTurnChange
+                ))
+            : showPlayerEliminated
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Scored: $lastTurnPoints',
-                        style: TextStyle(
+                        '$letterReceivedPlayer is eliminated!',
+                        style: AppTextStyles.bustOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
-                      SizedBox(height: 8 * (turnNameFontSize / 40)),
+                      SizedBox(height: 12 * (turnNameFontSize / 40)),
                       Text(
-                        lastTurnLabels,
-                        style: TextStyle(
-                          fontSize: turnTextFontSize,
-                          color: Theme.of(context).colorScheme.onPrimary,
+                        '$letterReceivedPlayer is a DONKEY! 🐴',
+                        style: AppTextStyles.bustOverlay().copyWith(
+                          fontSize: turnTextFontSize + 4,
+                          fontWeight: FontWeight.normal,
                         ),
+                      ),
+                    ],
+                  )
+                : showLetterReceived
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$letterReceivedPlayer got a letter!',
+                            style: AppTextStyles.bustOverlay().copyWith(
+                              fontSize: turnNameFontSize,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 12 * (turnNameFontSize / 40)),
+                          Text(
+                            'Letters: ${letterReceivedLetters.split('').join('-')}',
+                            style: AppTextStyles.bustOverlay().copyWith(
+                              fontSize: turnTextFontSize + 4,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      )
+                : showTurnChange
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Scored: $lastTurnPoints',
+                            style: AppTextStyles.turnChangeOverlay().copyWith(
+                              fontSize: turnNameFontSize,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 8 * (turnNameFontSize / 40)),
+                          Text(
+                            lastTurnLabels,
+                            style: AppTextStyles.turnChangeOverlay().copyWith(
+                              fontSize: turnTextFontSize,
+                              fontWeight: FontWeight.normal,
+                            ),
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(
                         "$nextPlayerName's turn!",
-                        style: TextStyle(
+                        style: AppTextStyles.turnChangeOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                     ],
@@ -110,16 +208,13 @@ class OverlayWidget extends StatelessWidget {
               animation: Listenable.merge([bustController, turnController]),
               builder: (_, __) => OverlayAnimation(
                 showBust: ctrl.showBust,
-                showTurnChange: ctrl.showTurnChange,
-                bgColor: ctrl.showBust
+                showTurnChange: ctrl.showTurnChange,                bgColor: ctrl.showBust
                     ? bustColorAnim.value!
                     : turnColorAnim.value!,
                 lastTurnPoints: ctrl.lastTurnPoints(),
                 lastTurnLabels: ctrl.lastTurnLabels(),
                 nextPlayerName: nextName,
-                bustFontSize: 72,
-                turnNameFontSize: 40,
-                turnTextFontSize: 20,
+                size: OverlaySize.large,
               ),
             ),
           ),
