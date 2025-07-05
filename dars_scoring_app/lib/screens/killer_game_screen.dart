@@ -347,173 +347,161 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       appBar: AppBar(
         title: const Text('Killer'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        actions: [
-          IconButton(
-            onPressed: () => _showGameInfo(),
-            icon: const Icon(Icons.info_outline),
-          ),
-          if (!isGameCompleted)
-            IconButton(
-              onPressed: () => _pauseGame(),
-              icon: const Icon(Icons.pause),
-            ),
-        ],
       ),
-      body: Column(
-        children: [
-          // Dartboard
-          Expanded(
-            flex: 3,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              child: InteractiveDartboard(
-                size: 300,
-                killerTerritories: _getKillerTerritories(),
-                onAreaTapped: isGameCompleted ? null : (area) {
-                  // Auto-fill score input when dartboard is tapped
-                  _scoreController.text = area;
-                },
-                interactive: !isGameCompleted,
-              ),
-            ),
-          ),
-          
-          // Player status
-          Expanded(
-            flex: 2,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Current player info
-                  if (currentPlayer != null && !isGameCompleted)
-                    Card(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Current Player: ${currentPlayer.name}',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                Text('Territory: ${currentPlayer.territory.join(', ')}'),
-                                Text('Health: ${currentPlayer.health}'),
-                                Text('Status: ${_getPlayerStatus(currentPlayer)}'),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Dartboard section - takes up top portion
+            Expanded(
+              flex: 6,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: InteractiveDartboard(
+                      size: 300,
+                      killerTerritories: _getKillerTerritories(),
+                      interactive: false, // Pure visual now
                     ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Player list
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Players',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: ListView.builder(
-                                itemCount: players.length,
-                                itemBuilder: (context, index) {
-                                  final player = players[index];
-                                  final color = KillerGameUtils.getPlayerColor(index);
-                                  final isCurrentTurn = index == currentPlayerIndex && !isGameCompleted;
-                                  
-                                  return ListTile(
-                                    leading: Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: color,
-                                        shape: BoxShape.circle,
-                                        border: isCurrentTurn ? Border.all(color: Colors.white, width: 3) : null,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      player.name,
-                                      style: TextStyle(
-                                        fontWeight: isCurrentTurn ? FontWeight.bold : FontWeight.normal,
-                                        color: player.isEliminated ? Colors.grey : null,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      'Territory: ${player.territory.join(', ')} | Health: ${player.health} | ${_getPlayerStatus(player)}',
-                                      style: TextStyle(
-                                        color: player.isEliminated ? Colors.grey : null,
-                                      ),
-                                    ),
-                                    trailing: player.isEliminated 
-                                        ? const Icon(Icons.close, color: Colors.red)
-                                        : player.isKiller 
-                                            ? const Icon(Icons.star, color: Colors.amber)
-                                            : null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Score input
-          if (!isGameCompleted)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _scoreController,
-                          focusNode: _scoreFocusNode,
-                          decoration: const InputDecoration(
-                            labelText: 'Enter dart score',
-                            hintText: '20, T15, D5, BULL, 25',
-                            border: OutlineInputBorder(),
-                          ),
-                          textCapitalization: TextCapitalization.characters,
-                          onSubmitted: _processDart,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: () => _processDart(_scoreController.text),
-                        child: const Text('Throw'),
-                      ),
-                    ],
                   ),
                 ),
               ),
             ),
-        ],
+            
+            // Current player indicator
+            if (currentPlayer != null && !isGameCompleted)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Card(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      '${currentPlayer.name}\'s Turn',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            
+            // Control buttons section - takes up bottom portion
+            Expanded(
+              flex: 4,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Multiplier buttons row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _handleMultiplierTap(2),
+                            child: const Text('x2'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _handleMultiplierTap(3),
+                            child: const Text('x3'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Player/Target buttons - will be implemented in Phase 3
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 2.5,
+                        ),
+                        itemCount: players.length,
+                        itemBuilder: (context, index) {
+                          final player = players[index];
+                          final color = KillerGameUtils.getPlayerColor(index);
+                          
+                          return ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: color.withOpacity(0.2),
+                              foregroundColor: color,
+                              side: BorderSide(color: color),
+                            ),
+                            onPressed: () => _handlePlayerButtonTap(player.name),
+                            child: Text(
+                              player.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Action buttons row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.withOpacity(0.2),
+                              foregroundColor: Colors.grey[700],
+                            ),
+                            onPressed: () => _handleMissTap(),
+                            child: const Text('Miss'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange.withOpacity(0.2),
+                              foregroundColor: Colors.orange[700],
+                            ),
+                            onPressed: () => _handleUndoTap(),
+                            child: const Text('Undo'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  // Placeholder methods for new button handlers - will be implemented in Phase 3
+  void _handleMultiplierTap(int multiplier) {
+    // TODO: Implement multiplier logic
+  }
+
+  void _handlePlayerButtonTap(String playerName) {
+    // TODO: Implement player button logic
+  }
+
+  void _handleMissTap() {
+    // TODO: Implement miss logic
+  }
+
+  void _handleUndoTap() {
+    // TODO: Implement undo logic
   }
 
   /// Get player status description
