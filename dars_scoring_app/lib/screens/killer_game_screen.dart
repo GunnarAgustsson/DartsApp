@@ -233,19 +233,39 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       final player = entry.value;
       final color = KillerGameUtils.getPlayerColor(index);
       
-      // FIXED: Visual feedback based on correct health system
+      // Enhanced visual feedback for health progression
+      double fillPercentage = 0.0;
+      double highlightOpacity = 0.4;
+      double pulseIntensity = 0.0;
+      
+      if (player.isEliminated) {
+        // Eliminated players: no fill, just dark border
+        fillPercentage = 0.0;
+        highlightOpacity = 0.2;
+      } else if (player.isKiller) {
+        // Killers: full bright glow
+        fillPercentage = 1.0;
+        highlightOpacity = 0.8;
+        pulseIntensity = index == currentPlayerIndex ? 0.3 : 0.1;
+      } else {
+        // Building health: gradual fill from 0 to 3
+        fillPercentage = (player.health / 3.0).clamp(0.0, 1.0);
+        highlightOpacity = 0.3 + (fillPercentage * 0.3); // More visible as health increases
+        pulseIntensity = index == currentPlayerIndex ? 0.2 : 0.0;
+      }
+      
       return KillerPlayerTerritory(
         playerName: player.name,
         areas: KillerGameUtils.territoryToStringSet(player.territory),
         playerColor: color,
-        highlightOpacity: 0.6,
-        isEliminated: player.isEliminated, // health < 0
-        isKiller: player.isKiller, // health >= 3
+        highlightOpacity: highlightOpacity,
+        isEliminated: player.isEliminated,
+        isKiller: player.isKiller,
         isCurrentPlayer: index == currentPlayerIndex,
-        borderOnly: player.isEliminated, // Only border for eliminated players
-        fillPercentage: player.isEliminated ? 0.0 : (player.health / 3.0).clamp(0.0, 1.0),
-        pulseIntensity: index == currentPlayerIndex ? 0.5 : 0.0,
-        showPlayerName: false,
+        borderOnly: player.isEliminated,
+        fillPercentage: fillPercentage,
+        pulseIntensity: pulseIntensity,
+        showPlayerName: true, // Show player names on territories
       );
     }).toList();
   }
