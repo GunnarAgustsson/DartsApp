@@ -42,8 +42,8 @@ class KillerPlayer {
     );
   }
 
-  /// Whether this player is eliminated (health <= 0)
-  bool get isEliminated => health <= 0;
+  /// Whether this player is eliminated (health < 0)
+  bool get isEliminated => health < 0;
 
   /// Whether this player can attack others (is killer and not eliminated)
   bool get canAttack => isKiller && !isEliminated;
