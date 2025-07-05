@@ -3,13 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
+import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 
 void main() {
   group('Traditional Game Save/Load Tests', () {
     setUp(() async {
-      // Clear SharedPreferences before each test
-      SharedPreferences.setMockInitialValues({});
+      // Clear SharedPreferences before each test and set animation speed to none
+      SharedPreferences.setMockInitialValues({
+        'animationSpeed': AnimationSpeed.none.index,
+      });
     });    test('should save and load a new traditional game', () async {
       // Create a new traditional game
       final players = ['Alice', 'Bob'];
@@ -19,9 +22,9 @@ void main() {
       );
       
       // Score to trigger save (games only save when there are throws)
-      await controller.score(20);
-        // Wait for the debounced save to complete
-      await Future.delayed(const Duration(milliseconds: 700)); // Increased wait time
+      await controller.score(20, '20');
+      // Wait for the debounced save to complete
+      await Future.delayed(const Duration(milliseconds: 600));
       
       // Load from SharedPreferences directly to verify
       final prefs = await SharedPreferences.getInstance();
@@ -44,11 +47,11 @@ void main() {
       );
       
       // Score some points
-      await controller.score(20); // Alice scores 20
-      await controller.score(20); // Alice scores another 20
-      await controller.score(17); // Alice scores 17, turn ends
-        // Wait for debounced save
-      await Future.delayed(const Duration(milliseconds: 700)); // Increased wait time      // Load the game from storage
+      await controller.score(20, '20'); // Alice scores 20
+      await controller.score(20, '20'); // Alice scores another 20
+      await controller.score(17, '17'); // Alice scores 17, turn ends
+      // Wait for debounced save
+      await Future.delayed(const Duration(milliseconds: 600));      // Load the game from storage
       final prefs = await SharedPreferences.getInstance();
       final games = prefs.getStringList('games_history') ?? [];
       expect(games.length, 1);
@@ -69,10 +72,10 @@ void main() {
       );
       
       // Alice throws 2 darts
-      await controller.score(20);      await controller.score(19);
+      await controller.score(20, '20');      await controller.score(19, '19');
       
       // Wait for save
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 600));
       
       // Load game and check state
       final prefs = await SharedPreferences.getInstance();
@@ -94,7 +97,7 @@ void main() {
       );
       
       // Alice wins with exact finish
-      await controller.score(50);
+      await controller.score(50, 'Bull');
       
       // Wait for save
       await Future.delayed(const Duration(milliseconds: 100));
@@ -116,10 +119,10 @@ void main() {
       );
       
       // Alice tries to finish but busts (hits single 50, leaving 1 point)
-      await controller.score(50);
+      await controller.score(50, 'Bull');
       
       // Wait for bust timer and turn change
-      await Future.delayed(const Duration(milliseconds: 2500));
+      await Future.delayed(const Duration(milliseconds: 5000)); // Increased to wait for both bust and turn change timers
         // Check that bust was handled correctly
       expect(controller.scoreFor('Alice'), 51); // Score should be reset to turn start
       expect(controller.currentPlayer, 1); // Should be Bob's turn        // Wait for save
@@ -147,13 +150,13 @@ void main() {
         players: players,
       );
       
-      await controller1.score(20); // Alice hits 20
-      await controller1.score(20); // Alice hits 20 again
-      await controller1.score(19); // Alice hits 19, turn ends
-        // Bob's turn now
-      await controller1.score(25); // Bob hits 25
+      await controller1.score(20, '20'); // Alice hits 20
+      await controller1.score(20, '20'); // Alice hits 20 again
+      await controller1.score(19, '19'); // Alice hits 19, turn ends
+      // Bob's turn now
+      await controller1.score(25, '25'); // Bob hits 25
       
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 600)); // Wait for save
       
       // Get the saved game
       final prefs = await SharedPreferences.getInstance();
@@ -186,9 +189,9 @@ void main() {
       );
       
       // Alice scores some points
-      await controller.score(20);
-      await controller.score(20);
-      await controller.score(17);
+      await controller.score(20, '20');
+      await controller.score(20, '20');
+      await controller.score(17, '17');
       
       // Undo the last throw
       await controller.undoLastThrow();
@@ -211,7 +214,7 @@ void main() {
       final controller1 = TraditionalGameController(
         startingScore: 501,
         players: ['Alice', 'Bob'],
-      );      await controller1.score(20);
+      );      await controller1.score(20, '20');
       await Future.delayed(const Duration(milliseconds: 700));
       controller1.dispose();
       
@@ -220,7 +223,7 @@ void main() {
         startingScore: 301,
         players: ['Charlie', 'Dave'],
       );
-      await controller2.score(25);
+      await controller2.score(25, '25');
       await Future.delayed(const Duration(milliseconds: 700));
       controller2.dispose();
       
@@ -246,14 +249,14 @@ void main() {
         players: players,
       );
         // Score and save multiple times
-      await controller.score(20);
+      await controller.score(20, '20');
       await Future.delayed(const Duration(milliseconds: 700));
       
-      await controller.score(19);
+      await controller.score(19, '19');
       await Future.delayed(const Duration(milliseconds: 700));
       
-      await controller.score(18);
-      await Future.delayed(const Duration(milliseconds: 700));
+      await controller.score(18, '18');
+      await Future.delayed(const Duration(milliseconds: 4000)); // Wait longer for turn change
       
       // Should only have one game, not three
       final prefs = await SharedPreferences.getInstance();

@@ -29,7 +29,6 @@ class TraditionalGameController extends ChangeNotifier {
   int currentPlayer = 0;              // index of active player
   int dartsThrown = 0;                // throws this turn (0–3)
   int turnStartScore = 0;             // score at beginning of turn
-  int multiplier = 1;                 // current x1/x2/x3 setting
   bool isTurnChanging = false;        // if we're in between‐turn cooldown
   bool showBust = false;              // flag to flash "BUST"
   bool showTurnChange = false;        // flag to flash turn‐change
@@ -185,8 +184,8 @@ class TraditionalGameController extends ChangeNotifier {
       // Convert to appropriate durations
       switch (animationSpeed) {
         case AnimationSpeed.none:
-          _bustDisplayDuration = const Duration(milliseconds: 100);
-          _turnChangeDuration = const Duration(milliseconds: 100);
+          _bustDisplayDuration = Duration.zero;
+          _turnChangeDuration = Duration.zero;
           break;
         case AnimationSpeed.fast:
           _bustDisplayDuration = const Duration(milliseconds: 800);
@@ -232,57 +231,69 @@ class TraditionalGameController extends ChangeNotifier {
 
   // ───── Public API ─────────────────────────────────────────────────────────
 
-  /// Toggle the multiplier (x1/x2/x3)
-  Future<void> setMultiplier(int v) async {
-    multiplier = (multiplier == v) ? 1 : v;
-    notifyListeners();
-  }
-
-  /// Main scoring method: apply a throw value (0,1–20,25,50)
-  Future<void> score(int value) async {
+  /// Main scoring method: apply a throw with value and optional label
+  Future<void> score(int totalScore, [String? label]) async {
     // Play sound and give haptic feedback
     _playDartSound();
     
     // On first dart of turn, remember starting score
     if (dartsThrown == 0) turnStartScore = scores[currentPlayer];
 
-    // Calculate hit and resulting score
-    final hit = _calculateEffectiveHit(value);
+    // Parse the label to get base value and multiplier
+    int baseValue;
+    int thrownMultiplier;
+    
+    if (label != null && label != 'Miss') {
+      if (label == 'Bull') {
+        baseValue = 50;
+        thrownMultiplier = 1;
+      } else if (label.startsWith('D')) {
+        baseValue = int.tryParse(label.substring(1)) ?? 0;
+        thrownMultiplier = 2;
+      } else if (label.startsWith('T')) {
+        baseValue = int.tryParse(label.substring(1)) ?? 0;
+        thrownMultiplier = 3;
+      } else {
+        // Single value
+        baseValue = int.tryParse(label) ?? totalScore;
+        thrownMultiplier = 1;
+      }
+    } else {
+      // Fallback: assume single hit
+      baseValue = totalScore;
+      thrownMultiplier = 1;
+    }
+
     final before = scores[currentPlayer];
-    final after = before - hit;
+    final after = before - totalScore;
     
     // Record the throw BEFORE checking for bust/win
-    // final isWinningThrow = (after == 0); // This variable was unused
-    
-    // Always record the throw first
     scores[currentPlayer] = after;
     currentGame.throws.add(DartThrow(
       player: players[currentPlayer],
-      value: value,
-      multiplier: (value == 25 || value == 50) ? 1 : multiplier,
+      value: baseValue,
+      multiplier: thrownMultiplier,
       resultingScore: after,
       timestamp: DateTime.now(),
       wasBust: false,
-    ));    // NOW handle bust or win scenarios
-    if (_handleBustOrWin(after, value)) {
-      // Save the game even if handling bust or win
-      currentGame.modifiedAt = DateTime.now();
-      debugPrint('Saving game after bust/win handling');
-      await _saveHistory(); // Direct save instead of debounced
+    ));
+
+    // NOW handle bust or win scenarios
+    if (_handleBustOrWin(after, baseValue)) {
+      // Don't save immediately - bust/win handling will save after timers complete
       return;
     }
 
     // Continue with normal flow for non-bust, non-win throws
     dartsThrown++;
     if (dartsThrown >= 3) {
-      dartsThrown = 0;
       _advanceTurn();
+      // Don't save immediately - _advanceTurn will handle saving after the turn change
+    } else {
+      // Save immediately for mid-turn throws
+      currentGame.modifiedAt = DateTime.now();
+      _debouncedSaveHistory();
     }
-    
-    // Reset multiplier and save history
-    multiplier = 1;
-    currentGame.modifiedAt = DateTime.now();
-    _debouncedSaveHistory();
     notifyListeners();
   }
   /// Play the dart throw sound with error handling
@@ -310,29 +321,28 @@ class TraditionalGameController extends ChangeNotifier {
     }
   }
 
-  /// Calculate the effective hit value with multiplier
-  int _calculateEffectiveHit(int value) {
-    // Bull and outer bull have fixed values, others use multiplier
-    return (value == 25 || value == 50) ? value : value * multiplier;
-  }
-
   /// Handle bust or win scenarios, returns true if handled
   bool _handleBustOrWin(int afterScore, int dartValue) {
     bool isBust = false, isWin = false;
     
-    switch (checkoutRule) {      case CheckoutRule.doubleOut:
+    // Get the multiplier from the last throw that was just added
+    final lastThrow = currentGame.throws.isNotEmpty ? currentGame.throws.last : null;
+    final thrownMultiplier = lastThrow?.multiplier ?? 1;
+    
+    switch (checkoutRule) {
+      case CheckoutRule.doubleOut:
         if (afterScore < 0 || afterScore == 1) {
           isBust = true;
         } else if (afterScore == 0 &&
-            (multiplier != 2 && dartValue != 50)) isBust = true;
+            (thrownMultiplier != 2 && dartValue != 50)) isBust = true;
         else if (afterScore == 0) isWin = true;
         break;
       case CheckoutRule.extendedOut:
         if (afterScore < 0 || afterScore == 1) {
           isBust = true;
         } else if (afterScore == 0 &&
-            (multiplier != 2 &&
-                multiplier != 3 &&
+            (thrownMultiplier != 2 &&
+                thrownMultiplier != 3 &&
                 dartValue != 50)) isBust = true;
         else if (afterScore == 0) isWin = true;
         break;
@@ -383,6 +393,13 @@ class TraditionalGameController extends ChangeNotifier {
 
     // Cancel any existing timer
     _bustTimer?.cancel();
+    
+    // If animations are disabled, advance turn immediately
+    if (_bustDisplayDuration == Duration.zero) {
+      showBust = false;
+      _advanceTurn();
+      return;
+    }
     
     // After delay, clear flag and advance turn
     _bustTimer = Timer(_bustDisplayDuration, () {
@@ -482,9 +499,7 @@ class TraditionalGameController extends ChangeNotifier {
     }
 
     // 5) Decrement dartsThrown (we just "undid" one dart)
-    dartsThrown = (dartsThrown - 1).clamp(0, 3);    // --- FIX: Restore multiplier to what it was for the undone throw ---
-    // If you store multiplier in DartThrow, restore it here:
-    multiplier = last.multiplier;
+    dartsThrown = (dartsThrown - 1).clamp(0, 3);
 
     // 6) Persist updated history & notify UI
     currentGame
@@ -502,6 +517,16 @@ class TraditionalGameController extends ChangeNotifier {
     // Cancel any existing timer
     _turnChangeTimer?.cancel();
     
+    // If animations are disabled, change turns immediately
+    if (_turnChangeDuration == Duration.zero) {
+      currentPlayer = _findNextActivePlayer(currentPlayer);
+      dartsThrown = 0;
+      currentGame.modifiedAt = DateTime.now();
+      _debouncedSaveHistory();
+      notifyListeners();
+      return;
+    }
+    
     showTurnChange = true;
     notifyListeners();
     
@@ -510,22 +535,23 @@ class TraditionalGameController extends ChangeNotifier {
       showTurnChange = false;
       currentPlayer = _findNextActivePlayer(currentPlayer);
       dartsThrown = 0;
+      
+      // Save after the turn change completes
+      currentGame.modifiedAt = DateTime.now();
+      _debouncedSaveHistory();
+      
       notifyListeners();
     });
   }  /// Debounced history saving to reduce frequency of writes
   void _debouncedSaveHistory() {
-    debugPrint('_debouncedSaveHistory called');
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDebounceDuration, () {
-      debugPrint('Debounced save timer triggered for save');
       _saveHistory();
     });
   }  /// Persist the game history list in SharedPreferences
   Future<void> _saveHistory() async {
-    debugPrint('_saveHistory method called');
     try {
       final prefs = await SharedPreferences.getInstance();
-      debugPrint('SharedPreferences instance obtained');
       // sync the live state into the history record:
       currentGame
         ..currentPlayer = currentPlayer
@@ -533,7 +559,6 @@ class TraditionalGameController extends ChangeNotifier {
         ..modifiedAt = DateTime.now();
 
       final games = prefs.getStringList('games_history') ?? [];
-      debugPrint('Current games count: ${games.length}');
       final json = jsonEncode(currentGame.toJson());
       // Replace or append this game's entry
       final idx = games.indexWhere((g) {
@@ -541,14 +566,11 @@ class TraditionalGameController extends ChangeNotifier {
       });
       if (idx < 0) {
         games.add(json);
-        debugPrint('Added new game, total games now: ${games.length}');
       } else {
         games[idx] = json;
-        debugPrint('Updated existing game, total games: ${games.length}');
       }
 
       await prefs.setStringList('games_history', games);
-      debugPrint('Successfully saved games to SharedPreferences');
     } catch (e) {
       debugPrint('Error saving game history: $e');
     }

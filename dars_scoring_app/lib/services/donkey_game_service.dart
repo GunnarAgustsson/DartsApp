@@ -17,7 +17,11 @@ class DonkeyGameController extends ChangeNotifier {
   int _currentPlayerIndex = 0;
   int _dartsThrown = 0;  int _currentTurnScore = 0;
   final List<String> _currentTurnDartLabels = [];
-  int _multiplier = 1;  // UI state
+  
+  // Last turn data for animations
+  int _lastTurnScore = 0;
+  String _lastTurnPlayer = '';
+  
   bool _showTurnChange = false;
   bool _isTurnChanging = false;
   bool _showPlayerFinished = false;
@@ -51,7 +55,12 @@ class DonkeyGameController extends ChangeNotifier {
   int get dartsThrown => _dartsThrown;
   int get currentTurnScore => _currentTurnScore;
   List<String> get currentTurnDartLabels => _currentTurnDartLabels;
-  int get multiplier => _multiplier;  bool get showTurnChange => _showTurnChange;
+  
+  // Last turn data for animations
+  int get lastTurnScore => _lastTurnScore;
+  String get lastTurnPlayer => _lastTurnPlayer;
+  
+  bool get showTurnChange => _showTurnChange;
   bool get isTurnChanging => _isTurnChanging;
   bool get showPlayerFinished => _showPlayerFinished;
   String? get lastFinisher => _lastFinisher;
@@ -142,15 +151,13 @@ class DonkeyGameController extends ChangeNotifier {
   /// Core Game Logic
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// Score a hit on a specific number with current multiplier
-  void score(int value) {
+  /// Score a hit with a given value and label (e.g., "D20", "T15")
+  void score(int points, [String? label]) {
     if (_isTurnChanging || _showTurnChange || isTurnComplete) return;
 
-    final points = value * _multiplier;
     _currentTurnScore += points;
-    _currentTurnDartLabels.add(_formatDartLabel(value, _multiplier));
-    _dartsThrown++;    // Reset multiplier after each dart
-    _multiplier = 1;
+    _currentTurnDartLabels.add(label ?? points.toString());
+    _dartsThrown++;
 
     // Auto-complete turn for 1-dart mode or when max darts reached
     if (variant == DonkeyVariant.oneDart || isTurnComplete) {
@@ -165,8 +172,7 @@ class DonkeyGameController extends ChangeNotifier {
     if (_isTurnChanging || _showTurnChange || isTurnComplete) return;
 
     _currentTurnDartLabels.add('Miss');
-    _dartsThrown++;    // Reset multiplier after miss
-    _multiplier = 1;
+    _dartsThrown++;
 
     // Auto-complete turn for 1-dart mode or when max darts reached
     if (variant == DonkeyVariant.oneDart || isTurnComplete) {
@@ -175,13 +181,6 @@ class DonkeyGameController extends ChangeNotifier {
 
     notifyListeners();
   }
-  /// Set multiplier for next dart
-  void setMultiplier(int multiplier) {
-    if (_isTurnChanging || _showTurnChange) return;
-    _multiplier = multiplier;
-    notifyListeners();
-  }
-
   /// Manually end the current turn
   void endTurn() {
     if (_isTurnChanging || _showTurnChange || _dartsThrown == 0) return;
@@ -266,8 +265,32 @@ class DonkeyGameController extends ChangeNotifier {
 
   /// Handle player elimination
   void _handlePlayerElimination(String playerName) {
+    // Store the current player name before updating the list
+    final currentPlayerName = _players[_currentPlayerIndex];
+    
     // Update active players list
+    final oldPlayersList = List<String>.from(_players);
     _players = _gameHistory.activePlayers;
+
+    // Adjust current player index if needed
+    if (_players.isNotEmpty) {
+      // Find the new index of the current player
+      final newIndex = _players.indexOf(currentPlayerName);
+      if (newIndex != -1) {
+        // Current player is still active, update index
+        _currentPlayerIndex = newIndex;
+      } else {
+        // Current player was eliminated, adjust index to maintain turn order
+        final eliminatedIndex = oldPlayersList.indexOf(playerName);
+        if (eliminatedIndex <= _currentPlayerIndex) {
+          // The eliminated player was before or at current position
+          // Decrease index to account for removed player
+          _currentPlayerIndex = (_currentPlayerIndex - 1).clamp(0, _players.length - 1);
+        }
+        // If eliminated player was after current position, no adjustment needed
+        _currentPlayerIndex = _currentPlayerIndex.clamp(0, _players.length - 1);
+      }
+    }
 
     // Check if game is finished
     if (_gameHistory.isGameFinished) {
@@ -289,11 +312,14 @@ class DonkeyGameController extends ChangeNotifier {
     }
     _isTurnChanging = true;
 
+    // Preserve last turn data for animations
+    _lastTurnScore = _currentTurnScore;
+    _lastTurnPlayer = _players[_currentPlayerIndex];
+
     // Reset turn state
     _currentTurnScore = 0;
     _currentTurnDartLabels.clear();
     _dartsThrown = 0;
-    _multiplier = 1;
 
     // Move to next active player
     _currentPlayerIndex = (_currentPlayerIndex + 1) % _players.length;
@@ -317,7 +343,7 @@ class DonkeyGameController extends ChangeNotifier {
 
   /// Undo the last dart thrown
   void undoLastThrow() {
-    if (_isTurnChanging || _dartsThrown == 0) return;
+    if (_dartsThrown == 0) return;
 
     // Remove last dart
     _currentTurnDartLabels.removeLast();
@@ -329,7 +355,6 @@ class DonkeyGameController extends ChangeNotifier {
     }
     
     _dartsThrown--;
-    _multiplier = 1;
 
     notifyListeners();
   }
@@ -366,24 +391,6 @@ class DonkeyGameController extends ChangeNotifier {
   // ─────────────────────────────────────────────────────────────────────────────
   /// Helper Functions
   // ─────────────────────────────────────────────────────────────────────────────
-
-  /// Format dart label for display
-  String _formatDartLabel(int value, int multiplier) {
-    if (value == 25) {
-      return multiplier == 2 ? 'Bull' : 'Bull'; // Bulls are always single in standard darts
-    }
-    
-    switch (multiplier) {
-      case 1:
-        return value.toString();
-      case 2:
-        return 'D$value';
-      case 3:
-        return 'T$value';
-      default:
-        return value.toString();
-    }
-  }
 
   /// Parse dart score from label
   int _parseDartScore(String dartLabel) {

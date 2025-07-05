@@ -164,7 +164,7 @@ class OverlayAnimation extends StatelessWidget {
                       ),
                       SizedBox(height: 8 * (turnNameFontSize / 40)),
                       Text(
-                        "$nextPlayerName's turn!",
+                        "It's $nextPlayerName's turn!",
                         style: AppTextStyles.turnChangeOverlay().copyWith(
                           fontSize: turnNameFontSize,
                           fontWeight: FontWeight.bold,

@@ -1,15 +1,13 @@
-import 'dart:math';
 
 import 'package:dars_scoring_app/models/donkey_game.dart';
 import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/services/donkey_game_service.dart';
-import 'package:dars_scoring_app/theme/app_dimensions.dart';
+import 'package:dars_scoring_app/theme/index.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/widgets/overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/scoring_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-import '../widgets/score_button.dart';
 
 /// Donkey game screen - HORSE-style darts game
 /// Players take turns trying to beat the previous score
@@ -72,6 +70,13 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     }
   }
 
+  /// Get the next player name for display
+  String get _nextPlayerName {
+    if (_ctrl.players.isEmpty) return '';
+    final nextIndex = (_ctrl.currentPlayer + 1) % _ctrl.players.length;
+    return _ctrl.players[nextIndex];
+  }
+
   Future<void> _showFinishDialog(String winner) {
     final theme = Theme.of(context);
     
@@ -85,15 +90,14 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
         ),
         actions: [
           TextButton(
-            child: Text('Continue', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).pop();
               _ctrl.clearPlayerFinishedFlag();
               _hasShownFinishDialog = false;
             },
+            child: Text('Continue'),
           ),
           TextButton(
-            child: Text('Play Again', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).pop();
               
@@ -120,12 +124,13 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                 ),
               );
             },
+            child: Text('Play Again'),
           ),
           TextButton(
-            child: Text('Main Menu', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
+            child: Text('Main Menu'),
           ),
         ],
       ),
@@ -196,9 +201,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     bool isTurnChanging,
   ) {    final theme = Theme.of(context);
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _ctrl.players.isNotEmpty && _ctrl.currentPlayer < _ctrl.players.length
-        ? _ctrl.players[(_ctrl.currentPlayer + 1) % _ctrl.players.length]
-        : '';
+    final nextPlayerName = _nextPlayerName;
 
     return Row(
       children: [
@@ -220,7 +223,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
         VerticalDivider(
           width: 1,
           thickness: 1,
-          color: theme.colorScheme.outline.withOpacity(0.5),
+          color: theme.colorScheme.outline.withValues(alpha: 0.5),
         ),        
         // Right side - Controls
         Expanded(
@@ -229,23 +232,9 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             child: Column(
               children: [
-                // Multiplier buttons (for both 1-dart and 3-dart modes)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
-                  child: _buildMultiplierButtons(isTurnChanging),
-                ),
-                
-                // Dartboard sections grid
+                // Dartboard sections grid with integrated multipliers and actions
                 Expanded(
-                  flex: 4,
                   child: _buildDartboardGrid(isDisabled),
-                ),
-                const SizedBox(height: AppDimensions.marginM),
-                
-                // Special Actions Area
-                Padding(
-                  padding: const EdgeInsets.only(top: AppDimensions.paddingM),
-                  child: _buildSpecialActions(isDisabled),
                 ),
               ],
             ),
@@ -260,11 +249,9 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     BuildContext context,
     bool showTurnChange,
     bool isTurnChanging,
-  ) {    final size = MediaQuery.of(context).size;
+  ) {
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _ctrl.players.isNotEmpty && _ctrl.currentPlayer < _ctrl.players.length
-        ? _ctrl.players[(_ctrl.currentPlayer + 1) % _ctrl.players.length]
-        : '';
+    final nextPlayerName = _nextPlayerName;
 
     return Column(
       children: [
@@ -285,25 +272,14 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
         // Controls Area
         Expanded(
           flex: 4,
-          child: Padding(            padding: const EdgeInsets.all(AppDimensions.paddingS),
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingS),
             child: Column(
               children: [
-                // Multiplier Buttons (for both 1-dart and 3-dart modes)
-                SizedBox(
-                  height: size.height * 0.07,
-                  child: _buildMultiplierButtons(isTurnChanging),
-                ),
-                const SizedBox(height: AppDimensions.marginM),
-
-                // Dartboard sections grid
+                // Dartboard sections grid with integrated multipliers and actions
                 Expanded(
-                  flex: 4,
                   child: _buildDartboardGrid(isDisabled),
                 ),
-                const SizedBox(height: AppDimensions.marginM),
-
-                // Special Actions (Miss, Undo)
-                _buildSpecialActions(isDisabled),
               ],
             ),
           ),
@@ -339,7 +315,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
           borderRadius: BorderRadius.circular(AppDimensions.radiusL),
           boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.shadow.withOpacity(0.1),
+              color: theme.colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -372,7 +348,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                   Text(
                     'Target to Beat',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   FittedBox(
@@ -389,7 +365,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                     Text(
                       'Set by ${shortenName(_ctrl.targetSetBy, maxLength: 10)}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                 ],
@@ -428,7 +404,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: currentPlayerState.letters.isEmpty 
-                        ? theme.colorScheme.onSurface.withOpacity(0.5)
+                        ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
                         : Colors.red,
                   ),
                 ),
@@ -461,7 +437,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                               height: 24,
                               colorFilter: ColorFilter.mode(
                                 isThrown
-                                    ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                    ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                     : theme.colorScheme.onSurface,
                                 BlendMode.srcIn,
                               ),
@@ -470,7 +446,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                               Text(
                                 label,
                                 style: TextStyle(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 8,
                                 ),
@@ -488,238 +464,28 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     );
   }
 
-  /// Build dartboard grid (standard dartboard numbers)
+  /// Build dartboard grid (always shows numbers 1-20 in sequential order)
   Widget _buildDartboardGrid(bool isDisabled) {
-    final theme = Theme.of(context);
-    
-    return LayoutBuilder(builder: (context, constraints) {
-      const crossAxisCount = 4;
-      const mainAxisCount = 6; // 6 rows to fit all numbers + bull
-      const hSpacing = AppDimensions.marginS;
-      const vSpacing = AppDimensions.marginS;
-
-      final buttonWidth = (constraints.maxWidth - (crossAxisCount - 1) * hSpacing) / crossAxisCount;
-      final buttonHeight = (constraints.maxHeight - (mainAxisCount - 1) * vSpacing) / mainAxisCount;
-      final side = min(buttonWidth, buttonHeight);
-      final numberButtonSize = Size(side, side);      // Numbers in numerical order (1-20)
-      final numbers = [
-        1, 2, 3, 4,
-        5, 6, 7, 8,
-        9, 10, 11, 12,
-        13, 14, 15, 16,
-        17, 18, 19, 20,
-      ];
-
-      List<Widget> rows = [];
-      
-      // Create 5 rows of 4 numbers each
-      for (int row = 0; row < 5; row++) {
-        List<Widget> rowButtons = [];
-        
-        for (int col = 0; col < 4; col++) {
-          final index = row * 4 + col;
-          final value = numbers[index];
-          
-          rowButtons.add(
-            Expanded(
-              child: ScoreButton(
-                value: value,
-                onPressed: () => _ctrl.score(value),
-                disabled: isDisabled || _ctrl.isTurnComplete,
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                foregroundColor: theme.colorScheme.primary,
-                size: ScoreButtonSize.custom,
-                customSize: numberButtonSize,
-              ),
-            ),
-          );
-          
-          if (col < 3) {
-            rowButtons.add(const SizedBox(width: hSpacing));
-          }
+    return ScoringButtons(
+      config: ScoringButtonsConfig(
+        showMultipliers: true,
+        show25Button: true,
+        showBullButton: true,
+        showMissButton: true,
+        showUndoButton: true,
+        disabled: isDisabled,
+      ),
+      onScore: (score, label) {
+        if (score == 0) {
+          _ctrl.scoreMiss();
+        } else {
+          _ctrl.score(score, label);
         }
-        
-        rows.add(Expanded(child: Row(children: rowButtons)));
-        if (row < 4) {
-          rows.add(const SizedBox(height: vSpacing));
-        }
-      }
-
-      // Add Bull button row (centered)
-      List<Widget> bullRow = [
-        const Spacer(),
-        Expanded(
-          child: ScoreButton(
-            value: 25,
-            label: 'Bull',
-            onPressed: () => _ctrl.score(25),
-            disabled: isDisabled || _ctrl.isTurnComplete,
-            backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-            foregroundColor: theme.colorScheme.secondary,
-            size: ScoreButtonSize.custom,
-            customSize: numberButtonSize,
-          ),
-        ),
-        const Spacer(),
-      ];
-      
-      rows.add(const SizedBox(height: vSpacing));
-      rows.add(Expanded(child: Row(children: bullRow)));
-
-      return Column(children: rows);
-    });
-  }
-  /// Build multiplier row buttons (for both 1-dart and 3-dart modes)
-  Widget _buildMultiplierButtons(bool isTurnChanging) {
-    final theme = Theme.of(context);
-    final isDisabled = isTurnChanging;
-
-    Widget buildButton(int multiplier, Color color, Color containerColor) {
-      final isSelected = _ctrl.multiplier == multiplier;
-      return Expanded(
-        flex: 2,
-        child: SizedBox(
-          height: 55,
-          child: isSelected
-              ? Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        color.withOpacity(0.7),
-                        color,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusL),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.5),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusL),
-                      ),
-                    ),
-                    onPressed: isDisabled ? null : () => _ctrl.setMultiplier(1),
-                    child: Text(
-                      'x$multiplier',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimary),
-                    ),
-                  ),
-                )
-              : OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: color,
-                    side: BorderSide(color: color.withOpacity(0.4), width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusL),
-                    ),
-                  ),
-                  onPressed: isDisabled ? null : () => _ctrl.setMultiplier(multiplier),
-                  child: Text('x$multiplier', style: const TextStyle(fontSize: 18)),
-                ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        const Spacer(),
-        buildButton(2, theme.colorScheme.secondary, theme.colorScheme.secondaryContainer),
-        const SizedBox(width: AppDimensions.marginS),
-        buildButton(3, theme.colorScheme.tertiary, theme.colorScheme.tertiaryContainer),
-        const Spacer(),
-      ],
+      },
+      onUndo: _ctrl.undoLastThrow,
     );
   }
-
-  /// Build special action buttons (Miss, Undo)
-  Widget _buildSpecialActions(bool isDisabled) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-    final isLandscape = size.width > size.height;
-    
-    final buttonHeight = isLandscape 
-        ? max(40.0, size.height * 0.075) 
-        : max(45.0, size.height * 0.055);    return Row(
-      children: [
-        // Miss Button  
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
-                side: BorderSide(color: theme.colorScheme.error, width: 2),
-                shape: const StadiumBorder(),
-              ),
-              onPressed: isDisabled || _ctrl.isTurnComplete ? null : () => _ctrl.scoreMiss(),
-              icon: const Icon(Icons.cancel_outlined, size: 18),
-              label: const Text(
-                'Miss',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: AppDimensions.marginS),
-        
-        // Undo Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
-                side: BorderSide(color: theme.colorScheme.error, width: 2),
-                shape: const StadiumBorder(),
-              ),
-              onPressed: (isDisabled || _ctrl.dartsThrown == 0) ? null : _ctrl.undoLastThrow,
-              icon: const Icon(Icons.undo, size: 18),
-              label: const Text(
-                'Undo',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ),
-        
-        // End Turn Button (only for 3-dart mode)
-        if (_ctrl.variant == DonkeyVariant.threeDart) ...[
-          const SizedBox(width: AppDimensions.marginS),
-          Expanded(
-            child: SizedBox(
-              height: buttonHeight,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  shape: const StadiumBorder(),
-                ),
-                onPressed: (isDisabled || _ctrl.dartsThrown == 0 || _ctrl.isTurnComplete) ? null : _ctrl.endTurn,
-                icon: const Icon(Icons.check, size: 18),
-                label: const Text(
-                  'End Turn',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }  /// Build overlay for turn change animation
+  /// Build overlay for turn change animation
   Widget _buildOverlayAnimation(bool showTurnChange, String nextPlayerName) {
     final showLetterReceived = _ctrl.showLetterReceived;
     final showPlayerEliminated = _ctrl.showPlayerEliminated;
@@ -742,9 +508,9 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
             showTurnChange: showTurnChange,
             showLetterReceived: showLetterReceived,
             showPlayerEliminated: showPlayerEliminated,
-            lastTurnPoints: _ctrl.currentTurnScore.toString(),
+            lastTurnPoints: showTurnChange ? _ctrl.lastTurnScore.toString() : _ctrl.currentTurnScore.toString(),
             lastTurnLabels: _ctrl.currentTurnDartLabels.join(', '),
-            nextPlayerName: nextPlayerName,
+            nextPlayerName: showTurnChange ? _ctrl.players[_ctrl.currentPlayer] : nextPlayerName,
             letterReceivedPlayer: _ctrl.letterReceivedPlayer ?? _ctrl.eliminatedPlayer ?? '',
             letterReceivedLetters: _ctrl.letterReceivedLetters ?? '',
             animationDuration: _ctrl.animationDuration,
@@ -779,7 +545,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
               Container(
                 padding: const EdgeInsets.all(AppDimensions.paddingS),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppDimensions.radiusM),
                   ),
@@ -835,11 +601,11 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                         ),
                         decoration: BoxDecoration(
                           color: isCurrentPlayer 
-                              ? theme.colorScheme.primary.withOpacity(0.1)
+                              ? theme.colorScheme.primary.withValues(alpha: 0.1)
                               : null,
                           border: Border(
                             bottom: BorderSide(
-                              color: theme.colorScheme.outline.withOpacity(0.1),
+                              color: theme.colorScheme.outline.withValues(alpha: 0.1),
                             ),
                           ),
                         ),
@@ -868,7 +634,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                                     : _ctrl.getDisplayLetters(playerName),
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: playerState.letters.isEmpty 
-                                      ? theme.colorScheme.onSurface.withOpacity(0.5)
+                                      ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
                                       : Colors.red,
                                   fontWeight: FontWeight.bold,
                                 ),

@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import 'package:dars_scoring_app/widgets/spiderweb_painter.dart';
+import 'package:dars_scoring_app/widgets/game_history_view.dart';
 
 // import 'package:dars_scoring_app/widgets/spiderweb_painter.dart'; // Removed external spiderweb import
 
@@ -513,59 +514,6 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     }
     
     return filtered;  }
-
-  void _showGameDetailsDialog(Map<String, dynamic> game) {
-    final throws = (game['throws'] as List)
-        .map((t) => {
-              'player': t['player'],
-              'value': t['value'],
-              'multiplier': t['multiplier'],
-              'resultingScore': t['resultingScore'],
-              'wasBust': t['wasBust'] ?? false,
-            })
-        .toList();
-    final date = DateTime.tryParse(game['createdAt'] ?? '') ?? DateTime.now();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Game Details (${date.toLocal().toString().split('.')[0]})'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: throws.length,
-                itemBuilder: (context, index) {
-                  final t = throws[index];
-                  return ListTile(
-                    dense: true,
-                    title: Text('${t['player']}'),
-                    subtitle: t['wasBust'] == true
-                        ? Text(
-                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}  (Bust)',
-                            style: const TextStyle(color: Colors.red),
-                          )
-                        : Text(
-                            'Hit: ${t['value']} x${t['multiplier']} | Score after: ${t['resultingScore']}',
-                          ),
-                  );
-                },
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1693,88 +1641,29 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
 
   // Build history tab (simple implementation for now)
   Widget _buildHistoryTab() {
-    final completedGames = lastGames.where((g) => g['completedAt'] != null).toList();
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Game History',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (completedGames.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'No completed games yet',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+    return GameHistoryView(
+      playerFilter: widget.playerName,
+      showRefreshButton: false,
+      allowDelete: false,
+      maxGames: 20,
+      emptyStateWidget: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.history, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'No games played yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
                 ),
               ),
-            )
-          else
-            ...completedGames.take(20).map((g) {
-              final date = DateTime.parse(g['createdAt']);
-              final completed = g['completedAt'] != null;
-              final isWin = g['winner'] == widget.playerName;
-              final winner = g['winner'];
-              final gameMode = g['gameMode'];
-              
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  title: Text(
-                    gameMode == 'Cricket' ? 'Cricket Game' : 'Game Mode: $gameMode',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat('MMM d, yyyy - h:mm a').format(date.toLocal()),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        !completed
-                            ? 'In Progress'
-                            : isWin
-                                ? 'You won!'
-                                : 'Winner: $winner',
-                        style: TextStyle(
-                          color: !completed
-                              ? Colors.orange
-                              : isWin
-                                  ? Colors.green
-                                  : Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.info_outline),
-                    onPressed: () => _showGameDetailsDialog(g),
-                    tooltip: 'Game Details',
-                  ),
-                  isThreeLine: true,
-                ),
-              );
-            }),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

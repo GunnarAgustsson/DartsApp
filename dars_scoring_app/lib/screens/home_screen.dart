@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/index.dart';
 import 'players_screen.dart';
 import 'game_modes_screen.dart';
-import 'history_screen.dart';
+import '../widgets/game_history_view.dart';
 import 'options_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -166,7 +166,17 @@ class HomeScreen extends StatelessWidget {
           label: 'History',
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const HistoryScreen()),
+            MaterialPageRoute(
+              builder: (context) => Scaffold(
+                appBar: AppBar(
+                  title: const Text('Game History'),
+                ),
+                body: const GameHistoryView(
+                  showRefreshButton: true,
+                  allowDelete: true,
+                ),
+              ),
+            ),
           ),
           icon: Icons.history,
         ),

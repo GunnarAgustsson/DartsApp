@@ -181,8 +181,8 @@ void main() {
       // Wait for async initialization
       await Future.delayed(const Duration(milliseconds: 100));
       
-      threeController.setMultiplier(2);
-      threeController.score(20); // Double 20 = 40
+      // Note: Multipliers are now handled by ScoringButtons widget
+      threeController.score(40, 'D20'); // Double 20 = 40
       
       expect(threeController.currentTurnScore, 40);
       expect(threeController.currentTurnDartLabels.last, 'D20');

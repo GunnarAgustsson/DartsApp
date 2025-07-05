@@ -1,15 +1,12 @@
-import 'dart:math';
-
 import 'package:dars_scoring_app/data/possible_finishes.dart';
 import 'package:dars_scoring_app/models/game_history.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
 import 'package:dars_scoring_app/theme/app_dimensions.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
 import 'package:dars_scoring_app/widgets/overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/scoring_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-import '../widgets/score_button.dart';
 
 /// The main game screen for "traditional" scoring (e.g. 301/501/X01).
 /// Splits UI into:
@@ -298,23 +295,20 @@ class _GameScreenState extends State<GameScreen>
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             child: Column(
               children: [
-                // Multiplier buttons
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
-                  child: _buildMultiplierButtons(isTurnChanging, showBust),
-                ),
-                
-                // Score grid
+                // Scoring buttons (replaces multiplier buttons, score grid, and special actions)
                 Expanded(
-                  flex: 3,
-                  child: _buildKeypad(isDisabled),
-                ),
-                const SizedBox(height: AppDimensions.marginM),
-                
-                // Special Actions Area
-                Padding(
-                  padding: const EdgeInsets.only(top: AppDimensions.paddingM),
-                  child: _buildSpecialActions(isDisabled),
+                  child: ScoringButtons(
+                    config: ScoringButtonsConfig(
+                      showMultipliers: true,
+                      show25Button: true,
+                      showBullButton: true,
+                      showMissButton: true,
+                      showUndoButton: true,
+                      disabled: isDisabled,
+                    ),
+                    onScore: (score, label) => _ctrl.score(score, label),
+                    onUndo: _ctrl.undoLastThrow,
+                  ),
                 ),
               ],
             ),
@@ -335,7 +329,6 @@ class _GameScreenState extends State<GameScreen>
     int nxtIdx,
     List<int> actScores,
   ) {
-    final size = MediaQuery.of(context).size;
     final isDisabled = isTurnChanging || showBust || showTurnChange;
     final nextPlayerName = activePlayers[nxtIdx];
 
@@ -373,20 +366,21 @@ class _GameScreenState extends State<GameScreen>
             padding: const EdgeInsets.all(AppDimensions.paddingS),
             child: Column(
               children: [
-                // Multiplier Buttons
-                SizedBox(
-                  height: size.height * 0.07,
-                  child: _buildMultiplierButtons(isTurnChanging, showBust),
-                ),
-                const SizedBox(height: AppDimensions.marginM),
-
-                // Main Keypad Area
+                // Scoring buttons (replaces multiplier buttons, keypad, and special actions)
                 Expanded(
-                  flex: 3,
-                  child: _buildKeypad(isDisabled),
+                  child: ScoringButtons(
+                    config: ScoringButtonsConfig(
+                      showMultipliers: true,
+                      show25Button: true,
+                      showBullButton: true,
+                      showMissButton: true,
+                      showUndoButton: true,
+                      disabled: isDisabled,
+                    ),
+                    onScore: (score, label) => _ctrl.score(score, label),
+                    onUndo: _ctrl.undoLastThrow,
+                  ),
                 ),
-                const SizedBox(height: AppDimensions.marginM),                // Special Actions (25, Bull, Miss, Undo)
-                _buildSpecialActions(isDisabled),
               ],
             ),
           ),
@@ -395,354 +389,6 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _buildKeypad(bool isDisabled) {
-    return LayoutBuilder(builder: (context, constraints) {
-      const crossAxisCount = 5;
-      const mainAxisCount = 4; // 4 rows for numbers
-      const hSpacing = AppDimensions.marginS;
-      const vSpacing = AppDimensions.marginS;
-
-      final buttonWidth = (constraints.maxWidth - (crossAxisCount - 1) * hSpacing) / crossAxisCount;
-      final buttonHeight = (constraints.maxHeight - (mainAxisCount - 1) * vSpacing) / mainAxisCount;
-      final side = min(buttonWidth, buttonHeight);
-      final numberButtonSize = Size(side, side);
-
-      List<Widget> keypadRows = [];
-      // Generate number button rows
-      for (int row = 0; row < 4; row++) {
-        List<Widget> rowButtons = [];
-        for (int col = 0; col < 5; col++) {
-          final value = row * 5 + col + 1;
-          rowButtons.add(
-            Expanded(
-              child: ScoreButton(
-                value: value,
-                onPressed: () => _ctrl.score(value),
-                disabled: isDisabled,
-                size: ScoreButtonSize.custom,
-                customSize: numberButtonSize,
-              ),
-            ),
-          );
-          if (col < 4) {
-            rowButtons.add(const SizedBox(width: hSpacing));
-          }
-        }
-        keypadRows.add(Expanded(child: Row(children: rowButtons)));
-        if (row < 3) {
-          keypadRows.add(const SizedBox(height: vSpacing));
-        }
-      }
-
-      return Column(children: keypadRows);
-    });
-  }
-
-  /// Build multiplier row buttons
-  Widget _buildMultiplierButtons(bool isTurnChanging, bool showBust) {
-    final theme = Theme.of(context);
-    final isDisabled = isTurnChanging || showBust;
-
-    Widget buildButton(int multiplier, Color color, Color containerColor) {
-      final isSelected = _ctrl.multiplier == multiplier;
-      return Expanded(
-        flex: 2,
-        child: SizedBox(
-          height: 55,
-          child: isSelected
-              ? Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        color.withOpacity(0.7),
-                        color,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusL),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.5),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppDimensions.radiusL),
-                      ),
-                    ),
-                    onPressed:
-                        isDisabled ? null : () => _ctrl.setMultiplier(1),
-                    child: Text(
-                      'x$multiplier',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimary),
-                    ),
-                  ),
-                )
-              : OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: color,
-                    side: BorderSide(color: color.withOpacity(0.4), width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusL),
-                    ),
-                  ),
-                  onPressed:
-                      isDisabled ? null : () => _ctrl.setMultiplier(multiplier),
-                  child: Text('x$multiplier', style: const TextStyle(fontSize: 18)),
-                ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        const Spacer(),
-        buildButton(2, theme.colorScheme.secondary,
-            theme.colorScheme.secondaryContainer),
-        const SizedBox(width: AppDimensions.marginS),
-        buildButton(
-            3, theme.colorScheme.tertiary, theme.colorScheme.tertiaryContainer),
-        const Spacer(),
-      ],
-    );
-  }  /// Build special action buttons (25, Bull, Miss, Undo)
-  Widget _buildSpecialActions(bool isDisabled) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-    final isLandscape = size.width > size.height;
-    final textScaleFactor = MediaQuery.of(context).textScaleFactor;
-    
-    // More aggressive responsiveness for small scaling
-    final buttonHeight = isLandscape 
-        ? max(40.0, size.height * 0.075) 
-        : max(45.0, size.height * 0.055);
-    
-    // Responsive font size with text scale factor consideration
-    final baseFontSize = isLandscape 
-        ? min(14.0, size.width * 0.018) 
-        : min(16.0, size.width * 0.035);
-    final fontSize = baseFontSize / max(1.0, textScaleFactor * 0.8);
-    
-    // Responsive icon size with scale factor
-    final baseIconSize = isLandscape 
-        ? min(16.0, size.width * 0.02) 
-        : min(18.0, size.width * 0.04);
-    final iconSize = baseIconSize / max(1.0, textScaleFactor * 0.8);
-    
-    // Tighter spacing for small scaling
-    final spacing = isLandscape || textScaleFactor < 1.0
-        ? AppDimensions.marginXS / 2
-        : AppDimensions.marginXS;
-
-    return Row(
-      children: [
-        // 25 Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: const StadiumBorder(),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isLandscape ? 8.0 : 12.0,
-                  vertical: 4.0,
-                ),
-              ),
-              onPressed: isDisabled ? null : () => _ctrl.score(25),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  "25",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: fontSize,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: spacing),
-        // Bull Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
-                shape: const StadiumBorder(),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isLandscape ? 8.0 : 12.0,
-                  vertical: 4.0,
-                ),
-              ),
-              onPressed: isDisabled ? null : () => _ctrl.score(50),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  "Bull",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: fontSize,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: spacing),        // Miss Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: textScaleFactor < 1.0 || size.width < 400
-                ? // Compact version for very small screens
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      side: BorderSide(color: theme.colorScheme.error, width: 2),
-                      shape: const StadiumBorder(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4.0,
-                        vertical: 2.0,
-                      ),
-                    ),
-                    onPressed: isDisabled ? null : () => _ctrl.score(0),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.cancel_outlined, 
-                            size: iconSize,
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            'Miss',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: fontSize * 0.7,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : // Regular version with icon and label
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      side: BorderSide(color: theme.colorScheme.error, width: 2),
-                      shape: const StadiumBorder(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isLandscape ? 6.0 : 8.0,
-                        vertical: 4.0,
-                      ),
-                    ),
-                    onPressed: isDisabled ? null : () => _ctrl.score(0),
-                    icon: Icon(
-                      Icons.cancel_outlined, 
-                      size: iconSize,
-                    ),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Miss',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: fontSize * 0.9,
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
-        ),
-        SizedBox(width: spacing),
-        // Undo Button
-        Expanded(
-          child: SizedBox(
-            height: buttonHeight,
-            child: textScaleFactor < 1.0 || size.width < 400
-                ? // Compact version for very small screens
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      side: BorderSide(color: theme.colorScheme.error, width: 2),
-                      shape: const StadiumBorder(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4.0,
-                        vertical: 2.0,
-                      ),
-                    ),
-                    onPressed: isDisabled ? null : _ctrl.undoLastThrow,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.undo, 
-                            size: iconSize,
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            'Undo',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: fontSize * 0.7,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : // Regular version with icon and label
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      side: BorderSide(color: theme.colorScheme.error, width: 2),
-                      shape: const StadiumBorder(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isLandscape ? 6.0 : 8.0,
-                        vertical: 4.0,
-                      ),
-                    ),
-                    onPressed: isDisabled ? null : _ctrl.undoLastThrow,
-                    icon: Icon(
-                      Icons.undo, 
-                      size: iconSize,
-                    ),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Undo',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: fontSize * 0.9,
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
   /// Build overlay for animations (bust or turn change)
   Widget _buildOverlayAnimation(
     bool showBust, 

@@ -51,19 +51,7 @@ class GameModeScreen extends StatelessWidget {
                       items: TraditionalVariant.values.map((TraditionalVariant variant) {
                         return DropdownMenuItem<TraditionalVariant>(
                           value: variant,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(variant.title, style: const TextStyle(fontSize: 16)),
-                              Text(
-                                variant.description,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ],
-                          ),
+                          child: Text(variant.title, style: const TextStyle(fontSize: 16)),
                         );
                       }).toList(),
                       onChanged: (TraditionalVariant? newValue) {
@@ -88,19 +76,7 @@ class GameModeScreen extends StatelessWidget {
                       items: CheckoutRule.values.map((CheckoutRule rule) {
                         return DropdownMenuItem<CheckoutRule>(
                           value: rule,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(_getCheckoutRuleTitle(rule), style: const TextStyle(fontSize: 16)),
-                              Text(
-                                _getCheckoutRuleSubtitle(rule),
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ],
-                          ),
+                          child: Text(_getCheckoutRuleTitle(rule), style: const TextStyle(fontSize: 16)),
                         );
                       }).toList(),
                       onChanged: (CheckoutRule? newValue) {
@@ -175,6 +151,42 @@ class GameModeScreen extends StatelessWidget {
                         );
                       },
                     ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Game Description Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Game Description:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedVariant.description,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Checkout Rule:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getCheckoutRuleSubtitle(selectedRule),
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -236,19 +248,7 @@ class GameModeScreen extends StatelessWidget {
                       items: CricketVariant.values.map((CricketVariant variant) {
                         return DropdownMenuItem<CricketVariant>(
                           value: variant,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(variant.title, style: const TextStyle(fontSize: 16)),
-                              Text(
-                                variant.description,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ],
-                          ),
+                          child: Text(variant.title, style: const TextStyle(fontSize: 16)),
                         );
                       }).toList(),
                       onChanged: (CricketVariant? newValue) {
@@ -323,6 +323,32 @@ class GameModeScreen extends StatelessWidget {
                         );
                       },
                     ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Game Description Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Game Description:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedVariant.description,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -382,19 +408,7 @@ class GameModeScreen extends StatelessWidget {
                       items: DonkeyVariant.values.map((DonkeyVariant variant) {
                         return DropdownMenuItem<DonkeyVariant>(
                           value: variant,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(variant.title, style: const TextStyle(fontSize: 16)),
-                              Text(
-                                variant.description,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 2,
-                              ),
-                            ],
-                          ),
+                          child: Text(variant.title, style: const TextStyle(fontSize: 16)),
                         );
                       }).toList(),
                       onChanged: (DonkeyVariant? newValue) {
@@ -468,6 +482,32 @@ class GameModeScreen extends StatelessWidget {
                           },
                         );
                       },
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Game Description Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Game Description:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedVariant.description,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
