@@ -58,43 +58,34 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   }
 
   /// Initialize the game with random territories
-  void _initializeGame() {
+  void _initializeGame() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Set up player order
-      List<String> orderedNames = List.from(widget.playerNames);
-      if (widget.randomOrder) {
-        orderedNames.shuffle();
+      // Check if there's an existing game to resume
+      final existingGame = await KillerGameStateService.loadGameState();
+      
+      if (existingGame != null && !existingGame.isCompleted) {
+        // Resume existing game
+        players = existingGame.players;
+        currentPlayerIndex = existingGame.currentPlayerIndex;
+        gameStartTime = existingGame.gameStartTime;
+        totalDartsThrown = existingGame.totalDartsThrown;
+        isGameCompleted = existingGame.isCompleted;
+        winner = existingGame.winner;
+        
+        // Show resume confirmation
+        final shouldResume = await _showResumeDialog();
+        if (!shouldResume) {
+          // Start new game instead
+          await _startNewGame();
+        }
+      } else {
+        // Start new game
+        await _startNewGame();
       }
-
-      // Generate random territories
-      final territories = KillerGameUtils.getRandomTerritories(orderedNames.length);
-
-      // Create players with assigned territories and colors
-      // FIXED: Players start at 0 health and work UP to become killers
-      players = orderedNames.asMap().entries.map((entry) {
-        final index = entry.key;
-        final name = entry.value;
-        return KillerPlayer(
-          name: name,
-          territory: territories[index],
-          health: 0, // Start at 0, work up to 3 to become killer
-          isKiller: false,
-          hitCount: 0,
-        );
-      }).toList();
-
-      currentPlayerIndex = 0;
-      gameStartTime = DateTime.now();
-      totalDartsThrown = 0;
-      isGameCompleted = false;
-      winner = null;
-
-      // Save initial game state
-      _saveGameState();
     } catch (e) {
       _showErrorDialog('Failed to initialize game: $e');
     } finally {
@@ -172,6 +163,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     // Clear input and save state
     _scoreController.clear();
     _saveGameState();
+    _updateGameHistory();
   }
 
   /// Move to the next active player
@@ -228,8 +220,81 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       isCompleted: isGameCompleted,
       winner: winner,
     );
-    
+
     await KillerGameStateService.saveGameState(gameState);
+  }
+
+  /// Create initial game history entry
+  Future<void> _createGameHistory() async {
+    // History will be continuously updated as the game progresses
+    // For now, we just ensure the game state is saved
+    await _saveGameState();
+  }
+
+  /// Update game history after each dart
+  Future<void> _updateGameHistory() async {
+    // Update the game state which serves as our ongoing history
+    await _saveGameState();
+  }
+
+  /// Show dialog asking if user wants to resume existing game
+  Future<bool> _showResumeDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Resume Game?'),
+        content: const Text('You have an unfinished Killer game. Would you like to resume it or start a new one?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('New Game'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Resume'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// Start a completely new game
+  Future<void> _startNewGame() async {
+    // Set up player order
+    List<String> orderedNames = List.from(widget.playerNames);
+    if (widget.randomOrder) {
+      orderedNames.shuffle();
+    }
+
+    // Generate random territories
+    final territories = KillerGameUtils.getRandomTerritories(orderedNames.length);
+
+    // Create players with assigned territories and colors
+    players = orderedNames.asMap().entries.map((entry) {
+      final index = entry.key;
+      final name = entry.value;
+      return KillerPlayer(
+        name: name,
+        territory: territories[index],
+        health: 0, // Start at 0, work up to 3 to become killer
+        isKiller: false,
+        hitCount: 0,
+      );
+    }).toList();
+
+    currentPlayerIndex = 0;
+    gameStartTime = DateTime.now();
+    totalDartsThrown = 0;
+    isGameCompleted = false;
+    winner = null;
+
+    // Create initial game history entry
+    await _createGameHistory();
+
+    // Save initial game state
+    await _saveGameState();
   }
 
   /// Get current player territories for dartboard visualization
@@ -745,13 +810,14 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   }
 
   /// Process a miss (no score)
-  void _processMiss() {
+  void _processMiss() async {
     setState(() {
       totalDartsThrown++;
     });
 
-    // Save state but don't automatically move to next player
-    _saveGameState();
+    // Save state and update history
+    await _saveGameState();
+    await _updateGameHistory();
   }
 
   /// Complete the current turn and move to next player
