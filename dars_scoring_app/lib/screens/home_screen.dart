@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/index.dart';
 import 'players_screen.dart';
 import 'game_modes_screen.dart';
+import 'dartboard_test_screen.dart';
 import '../widgets/game_history_view.dart';
 import 'options_screen.dart';
 
@@ -191,6 +192,18 @@ class HomeScreen extends StatelessWidget {
             MaterialPageRoute(builder: (context) => const PlayersScreen()),
           ),
           icon: Icons.people,
+        ),
+        
+        SizedBox(height: isTablet ? AppDimensions.marginL : AppDimensions.marginM),
+        
+        _buildMenuButton(
+          context: context,
+          label: 'Dartboard Test',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DartboardTestScreen()),
+          ),
+          icon: Icons.center_focus_strong,
         ),
         
         SizedBox(height: isTablet ? AppDimensions.marginL : AppDimensions.marginM),
