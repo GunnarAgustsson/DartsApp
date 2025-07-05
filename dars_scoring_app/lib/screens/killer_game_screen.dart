@@ -38,7 +38,6 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   
   // New state for button-based input
   int _selectedMultiplier = 1;
-  String? _pendingTargetPlayer;
   
   // Dart tracking state
   List<DartResult> _currentTurnDarts = [];
@@ -562,48 +561,60 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Multiplier buttons row with selection highlighting
+                    // Multiplier buttons row with selection highlighting and animations
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _selectedMultiplier == 2 
-                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                                  : Theme.of(context).colorScheme.surface,
-                              foregroundColor: _selectedMultiplier == 2
-                                  ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
-                              elevation: _selectedMultiplier == 2 ? 4 : 1,
-                            ),
-                            onPressed: isGameCompleted ? null : () => _handleMultiplierTap(2),
-                            child: Text(
-                              'x2',
-                              style: TextStyle(
-                                fontWeight: _selectedMultiplier == 2 ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 16,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _selectedMultiplier == 2 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                                    : Theme.of(context).colorScheme.surface,
+                                foregroundColor: _selectedMultiplier == 2
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                                elevation: _selectedMultiplier == 2 ? 6 : 2,
+                                shadowColor: _selectedMultiplier == 2 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
+                                    : null,
+                              ),
+                              onPressed: isGameCompleted ? null : () => _handleMultiplierTap(2),
+                              child: Text(
+                                'x2',
+                                style: TextStyle(
+                                  fontWeight: _selectedMultiplier == 2 ? FontWeight.bold : FontWeight.normal,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _selectedMultiplier == 3 
-                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                                  : Theme.of(context).colorScheme.surface,
-                              foregroundColor: _selectedMultiplier == 3
-                                  ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
-                              elevation: _selectedMultiplier == 3 ? 4 : 1,
-                            ),
-                            onPressed: isGameCompleted ? null : () => _handleMultiplierTap(3),
-                            child: Text(
-                              'x3',
-                              style: TextStyle(
-                                fontWeight: _selectedMultiplier == 3 ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 16,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _selectedMultiplier == 3 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                                    : Theme.of(context).colorScheme.surface,
+                                foregroundColor: _selectedMultiplier == 3
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                                elevation: _selectedMultiplier == 3 ? 6 : 2,
+                                shadowColor: _selectedMultiplier == 3 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
+                                    : null,
+                              ),
+                              onPressed: isGameCompleted ? null : () => _handleMultiplierTap(3),
+                              child: Text(
+                                'x3',
+                                style: TextStyle(
+                                  fontWeight: _selectedMultiplier == 3 ? FontWeight.bold : FontWeight.normal,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
@@ -693,28 +704,32 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                     
                     const SizedBox(height: 12),
                     
-                    // Action buttons row
+                    // Action buttons row with improved theming
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton(
+                          child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.withOpacity(0.2),
-                              foregroundColor: Colors.grey[700],
+                              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () => _handleMissTap(),
-                            child: const Text('Miss'),
+                            onPressed: isGameCompleted ? null : () => _handleMissTap(),
+                            icon: const Icon(Icons.close, size: 18),
+                            label: const Text('Miss'),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: ElevatedButton(
+                          child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange.withOpacity(0.2),
-                              foregroundColor: Colors.orange[700],
+                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                              foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            onPressed: () => _handleUndoTap(),
-                            child: const Text('Undo'),
+                            onPressed: (isGameCompleted || _currentTurnDarts.isEmpty) ? null : () => _handleUndoTap(),
+                            icon: const Icon(Icons.undo, size: 18),
+                            label: const Text('Undo'),
                           ),
                         ),
                       ],
@@ -736,9 +751,12 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     });
   }
 
-  void _handlePlayerButtonTap(String playerName) {
+  void _handlePlayerButtonTap(String playerName) async {
     // Don't allow more than 3 darts per turn
     if (_currentTurnDarts.length >= _maxDartsPerTurn) return;
+    
+    // Haptic feedback for successful button press
+    HapticFeedback.lightImpact();
     
     // Construct the dart hit based on the target player and current multiplier
     final targetPlayer = players.firstWhere((p) => p.name == playerName);
@@ -800,13 +818,32 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   }
 
   void _handleUndoTap() {
-    // TODO: Implement undo logic in Phase 4
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Undo functionality coming in Phase 4'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // Simple undo: if there are darts in current turn, remove the last one
+    if (_currentTurnDarts.isNotEmpty) {
+      setState(() {
+        _currentTurnDarts.removeLast();
+        if (totalDartsThrown > 0) {
+          totalDartsThrown--;
+        }
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Last dart undone'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Update history
+      _updateGameHistory();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No darts to undo this turn'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   /// Process a miss (no score)
