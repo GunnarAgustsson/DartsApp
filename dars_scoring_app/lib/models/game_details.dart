@@ -100,3 +100,30 @@ class DonkeyGameDetails {
     return 'DonkeyGameDetails(players: $players, variant: $variant, randomOrder: $randomOrder)';
   }
 }
+
+/// Details for setting up a Killer game
+class KillerGameDetails {
+  final List<String> players;
+  final bool randomOrder;
+
+  const KillerGameDetails({
+    required this.players,
+    required this.randomOrder,
+  });
+
+  /// Create a copy with updated values
+  KillerGameDetails copyWith({
+    List<String>? players,
+    bool? randomOrder,
+  }) {
+    return KillerGameDetails(
+      players: players ?? this.players,
+      randomOrder: randomOrder ?? this.randomOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'KillerGameDetails(players: $players, randomOrder: $randomOrder)';
+  }
+}
