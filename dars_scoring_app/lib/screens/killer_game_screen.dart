@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/killer_player.dart';
+import '../models/killer_game_history.dart';
 import '../utils/killer_game_utils.dart';
 import '../services/killer_game_state_service.dart';
+import '../services/killer_game_history_service.dart';
 import '../widgets/interactive_dartboard.dart';
 
 /// Main screen for playing Killer darts game
@@ -183,8 +185,29 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       winner = winnerName;
     });
     
+    // Save to history
+    _saveToHistory(winnerName);
+    
     KillerGameStateService.markGameCompleted();
     _showWinnerDialog(winnerName);
+  }
+
+  /// Save completed game to history
+  Future<void> _saveToHistory(String winnerName) async {
+    if (gameStartTime == null) return;
+
+    try {
+      final gameHistory = KillerGameHistory.fromGameData(
+        gameStartTime: gameStartTime!,
+        players: players,
+        winner: winnerName,
+        totalDartsThrown: totalDartsThrown,
+      );
+
+      await KillerGameHistoryService.saveGameToHistory(gameHistory);
+    } catch (e) {
+      debugPrint('Error saving Killer game to history: $e');
+    }
   }
 
   /// Save current game state

@@ -1,12 +1,14 @@
 import '../models/game_history.dart';
 import '../models/cricket_game.dart';
 import '../models/donkey_game.dart';
+import '../models/killer_game_history.dart';
 
 /// Game type enumeration
 enum GameType {
   traditional,
   cricket,
   donkey,
+  killer,
 }
 
 /// Unified game history model that can represent traditional, cricket, and donkey games
@@ -28,6 +30,9 @@ class UnifiedGameHistory {
   
   // For donkey games
   final DonkeyGameHistory? donkeyGame;
+  
+  // For killer games
+  final KillerGameHistory? killerGame;
 
   UnifiedGameHistory._({
     required this.id,
@@ -41,6 +46,7 @@ class UnifiedGameHistory {
     this.traditionalGame,
     this.cricketGame,
     this.donkeyGame,
+    this.killerGame,
   });
 
   /// Create from traditional game
@@ -86,13 +92,32 @@ class UnifiedGameHistory {
       gameType: GameType.donkey,
       donkeyGame: donkey,
     );
-  }  /// Create from JSON - auto-detects game type
+  }
+
+  /// Create from killer game
+  factory UnifiedGameHistory.fromKiller(KillerGameHistory killer) {
+    return UnifiedGameHistory._(
+      id: killer.id,
+      players: killer.playerNames,
+      createdAt: killer.gameStartTime,
+      modifiedAt: killer.gameEndTime,
+      winner: killer.winner,
+      completedAt: killer.gameEndTime,
+      gameMode: 'Killer',
+      gameType: GameType.killer,
+      killerGame: killer,
+    );
+  }
+
+  /// Create from JSON - auto-detects game type
   factory UnifiedGameHistory.fromJson(Map<String, dynamic> json) {
     final gameMode = json['gameMode'];
     if (gameMode == 'Cricket') {
       return UnifiedGameHistory.fromCricket(CricketGameHistory.fromJson(json));
     } else if (gameMode == 'Donkey') {
       return UnifiedGameHistory.fromDonkey(DonkeyGameHistory.fromJson(json));
+    } else if (gameMode == 'Killer') {
+      return UnifiedGameHistory.fromKiller(KillerGameHistory.fromJson(json));
     } else {
       return UnifiedGameHistory.fromTraditional(GameHistory.fromJson(json));
     }
@@ -104,6 +129,8 @@ class UnifiedGameHistory {
       return cricketGame?.throws.length ?? 0;
     } else if (gameType == GameType.donkey) {
       return donkeyGame?.turns.length ?? 0;
+    } else if (gameType == GameType.killer) {
+      return killerGame?.totalDartsThrown ?? 0;
     } else {
       return traditionalGame?.throws.length ?? 0;
     }
@@ -115,6 +142,8 @@ class UnifiedGameHistory {
       return 'Cricket';
     } else if (gameType == GameType.donkey) {
       return 'Donkey';
+    } else if (gameType == GameType.killer) {
+      return 'Killer';
     } else {
       final mode = traditionalGame?.gameMode ?? 0;
       if (mode == 301) return 'Traditional 301';
@@ -128,6 +157,8 @@ class UnifiedGameHistory {
       return cricketGame!.toJson();
     } else if (gameType == GameType.donkey && donkeyGame != null) {
       return donkeyGame!.toJson();
+    } else if (gameType == GameType.killer && killerGame != null) {
+      return killerGame!.toJson();
     } else if (traditionalGame != null) {
       return traditionalGame!.toJson();
     } else {

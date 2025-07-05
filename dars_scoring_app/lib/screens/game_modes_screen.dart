@@ -7,6 +7,7 @@ import '../data/possible_finishes.dart';
 import 'traditional_game_screen.dart';
 import 'cricket_game_screen.dart';
 import 'donkey_game_screen.dart';
+import 'killer_game_screen.dart';
 
 class GameModeScreen extends StatelessWidget {
   const GameModeScreen({super.key});
@@ -581,6 +582,153 @@ class GameModeScreen extends StatelessWidget {
     );
   }
 
+  /// Show dialog to select killer game settings
+  Future<KillerGameDetails?> _showKillerGameDialog(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final players = await _getPlayers();
+    final selectedPlayersList = <String>[];
+
+    bool randomOrder = prefs.getBool('randomOrder') ?? false;
+
+    return showDialog<KillerGameDetails>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Text('Setup Killer Game'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Random Order Checkbox
+                    CheckboxListTile(
+                      title: const Text('Random Player Order', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                        randomOrder 
+                            ? 'Players will be shuffled randomly at game start and on play again'
+                            : 'Players will follow selection order, shifting by one on play again',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      value: randomOrder,
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          randomOrder = value ?? false;
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    const Text('Select Players (2-8 players):', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        final isSelected = selectedPlayersList.contains(player);
+                        final order = isSelected ? selectedPlayersList.indexOf(player) + 1 : null;
+
+                        return ListTile(
+                          leading: isSelected
+                              ? CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                                  child: Text(
+                                    '$order',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : const CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Colors.grey,
+                                  child: SizedBox(),
+                                ),
+                          title: Text(player),
+                          onTap: () {
+                            setStateDialog(() {
+                              if (isSelected) {
+                                selectedPlayersList.remove(player);
+                              } else if (selectedPlayersList.length < 8) {
+                                selectedPlayersList.add(player);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Game Description Section
+                    Card(
+                      elevation: 2,
+                      color: Theme.of(context).colorScheme.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Game Description:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 14,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Elimination dart game where players compete for territories. Hit your assigned number to gain health and become a killer (3+ health). Killers can attack others by hitting their territories. Players are eliminated when their health goes below 0.',
+                              style: TextStyle(
+                                fontSize: 13, 
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedPlayersList.length < 2
+                    ? null
+                    : () => Navigator.of(context).pop(KillerGameDetails(
+                        players: selectedPlayersList.toList(), 
+                        randomOrder: randomOrder
+                      )),
+                child: const Text('Start Game'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _getCheckoutRuleTitle(CheckoutRule rule) {
     switch (rule) {
       case CheckoutRule.doubleOut:
@@ -677,6 +825,31 @@ class GameModeScreen extends StatelessWidget {
             players: finalPlayerOrder,
             randomOrder: selectionDetails.randomOrder,
             variant: selectionDetails.variant,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _onKillerGameSelected(BuildContext context) async {
+    final selectionDetails = await _showKillerGameDialog(context);
+
+    if (selectionDetails != null && selectionDetails.players.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('lastSelectedPlayers', selectionDetails.players);
+      await prefs.setBool('randomOrder', selectionDetails.randomOrder);
+
+      List<String> finalPlayerOrder = List.from(selectionDetails.players);
+      if (selectionDetails.randomOrder) {
+        finalPlayerOrder.shuffle();
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => KillerGameScreen(
+            playerNames: finalPlayerOrder,
+            randomOrder: selectionDetails.randomOrder,
           ),
         ),
       );
@@ -792,6 +965,13 @@ class GameModeScreen extends StatelessWidget {
                           icon: Icons.psychology,
                           onTap: () => _onDonkeyGameSelected(context),
                         ),
+                        _buildGameModeCard(
+                          context: context,
+                          title: 'Killer',
+                          description: 'Elimination game - be the last player standing',
+                          icon: Icons.gps_fixed,
+                          onTap: () => _onKillerGameSelected(context),
+                        ),
                       ],
                     )
                   else
@@ -817,6 +997,13 @@ class GameModeScreen extends StatelessWidget {
                           description: 'HORSE-style game - beat the score or get a letter',
                           icon: Icons.psychology,
                           onTap: () => _onDonkeyGameSelected(context),
+                        ),
+                        _buildGameModeCard(
+                          context: context,
+                          title: 'Killer',
+                          description: 'Elimination game - be the last player standing',
+                          icon: Icons.gps_fixed,
+                          onTap: () => _onKillerGameSelected(context),
                         ),
                       ],
                     ),

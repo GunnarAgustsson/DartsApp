@@ -69,6 +69,7 @@ class _GameHistoryViewState extends State<GameHistoryView> {
     final traditionalRaw = prefs.getStringList('games_history') ?? [];
     final cricketRaw = prefs.getStringList('cricket_games') ?? [];
     final donkeyRaw = prefs.getStringList('donkey_games') ?? [];
+    final killerRaw = prefs.getStringList('killer_game_history') ?? [];
     
     List<UnifiedGameHistory> allGames = [];
     
@@ -102,6 +103,16 @@ class _GameHistoryViewState extends State<GameHistoryView> {
       }
     }
     
+    // Parse killer games
+    for (String rawGame in killerRaw) {
+      try {
+        final game = UnifiedGameHistory.fromJson(jsonDecode(rawGame));
+        allGames.add(game);
+      } catch (e) {
+        debugPrint('Error parsing killer game: $e');
+      }
+    }
+
     // Filter by player if specified
     if (widget.playerFilter != null) {
       allGames = allGames
