@@ -35,6 +35,10 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   final TextEditingController _scoreController = TextEditingController();
   final FocusNode _scoreFocusNode = FocusNode();
   bool _isLoading = false;
+  
+  // New state for button-based input
+  int _selectedMultiplier = 1;
+  String? _pendingTargetPlayer;
 
   @override
   void initState() {
@@ -418,20 +422,50 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Multiplier buttons row
+                    // Multiplier buttons row with selection highlighting
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => _handleMultiplierTap(2),
-                            child: const Text('x2'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _selectedMultiplier == 2 
+                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                                  : Theme.of(context).colorScheme.surface,
+                              foregroundColor: _selectedMultiplier == 2
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
+                              elevation: _selectedMultiplier == 2 ? 4 : 1,
+                            ),
+                            onPressed: isGameCompleted ? null : () => _handleMultiplierTap(2),
+                            child: Text(
+                              'x2',
+                              style: TextStyle(
+                                fontWeight: _selectedMultiplier == 2 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => _handleMultiplierTap(3),
-                            child: const Text('x3'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _selectedMultiplier == 3 
+                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                                  : Theme.of(context).colorScheme.surface,
+                              foregroundColor: _selectedMultiplier == 3
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
+                              elevation: _selectedMultiplier == 3 ? 4 : 1,
+                            ),
+                            onPressed: isGameCompleted ? null : () => _handleMultiplierTap(3),
+                            child: Text(
+                              'x3',
+                              style: TextStyle(
+                                fontWeight: _selectedMultiplier == 3 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -439,7 +473,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                     
                     const SizedBox(height: 12),
                     
-                    // Player/Target buttons - will be implemented in Phase 3
+                    // Player/Target buttons with smart enabling
                     Expanded(
                       child: GridView.builder(
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -452,17 +486,65 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                         itemBuilder: (context, index) {
                           final player = players[index];
                           final color = KillerGameUtils.getPlayerColor(index);
+                          final currentPlayer = players[currentPlayerIndex];
+                          
+                          // Smart button enabling logic
+                          bool isEnabled = false;
+                          String buttonText = player.name;
+                          Color backgroundColor = color.withOpacity(0.2);
+                          Color foregroundColor = color;
+                          
+                          if (isGameCompleted || player.isEliminated) {
+                            // Game over or player eliminated
+                            isEnabled = false;
+                            backgroundColor = Colors.grey.withOpacity(0.1);
+                            foregroundColor = Colors.grey;
+                          } else if (index == currentPlayerIndex) {
+                            // Current player's own button
+                            if (!currentPlayer.isKiller) {
+                              // Non-killers can hit their own territory
+                              isEnabled = true;
+                              backgroundColor = color.withOpacity(0.3);
+                              buttonText = '${player.name} (${player.territory.join(', ')})';
+                            } else {
+                              // Killers cannot hit themselves
+                              isEnabled = false;
+                              backgroundColor = color.withOpacity(0.1);
+                              foregroundColor = color.withOpacity(0.5);
+                              buttonText = '${player.name} (Killer)';
+                            }
+                          } else {
+                            // Other player's button
+                            if (currentPlayer.isKiller) {
+                              // Killers can target other players
+                              isEnabled = true;
+                              backgroundColor = color.withOpacity(0.3);
+                              buttonText = '${player.name} (${player.territory.join(', ')})';
+                            } else {
+                              // Non-killers cannot target others
+                              isEnabled = false;
+                              backgroundColor = color.withOpacity(0.1);
+                              foregroundColor = color.withOpacity(0.5);
+                            }
+                          }
                           
                           return ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: color.withOpacity(0.2),
-                              foregroundColor: color,
-                              side: BorderSide(color: color),
+                              backgroundColor: backgroundColor,
+                              foregroundColor: foregroundColor,
+                              side: BorderSide(color: color.withOpacity(isEnabled ? 1.0 : 0.3)),
+                              elevation: isEnabled ? 2 : 0,
                             ),
-                            onPressed: () => _handlePlayerButtonTap(player.name),
+                            onPressed: isEnabled ? () => _handlePlayerButtonTap(player.name) : null,
                             child: Text(
-                              player.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              buttonText,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           );
                         },
@@ -507,21 +589,71 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     );
   }
 
-  // Placeholder methods for new button handlers - will be implemented in Phase 3
+  // Button handlers for new UI
   void _handleMultiplierTap(int multiplier) {
-    // TODO: Implement multiplier logic
+    setState(() {
+      _selectedMultiplier = multiplier;
+    });
   }
 
   void _handlePlayerButtonTap(String playerName) {
-    // TODO: Implement player button logic
+    // Construct the dart hit based on the target player and current multiplier
+    final targetPlayer = players.firstWhere((p) => p.name == playerName);
+    
+    // Determine which territory number to hit
+    // For now, we'll hit the first number in their territory
+    // In a real game, the player would specify which number they actually hit
+    final targetNumber = targetPlayer.territory.first;
+    
+    String dartScore;
+    if (_selectedMultiplier == 1) {
+      dartScore = targetNumber.toString();
+    } else if (_selectedMultiplier == 2) {
+      dartScore = 'D$targetNumber';
+    } else {
+      dartScore = 'T$targetNumber';
+    }
+    
+    // Process the dart
+    _processDart(dartScore);
+    
+    // Reset multiplier to 1 after use
+    setState(() {
+      _selectedMultiplier = 1;
+    });
   }
 
   void _handleMissTap() {
-    // TODO: Implement miss logic
+    // Process a miss (score 0)
+    _processMiss();
+    
+    // Reset multiplier
+    setState(() {
+      _selectedMultiplier = 1;
+    });
   }
 
   void _handleUndoTap() {
-    // TODO: Implement undo logic
+    // TODO: Implement undo logic in Phase 4
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Undo functionality coming in Phase 4'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Process a miss (no score)
+  void _processMiss() {
+    setState(() {
+      totalDartsThrown++;
+      
+      // Move to next player
+      _nextPlayer();
+    });
+
+    // Save state
+    _saveGameState();
   }
 
   /// Get player status description
