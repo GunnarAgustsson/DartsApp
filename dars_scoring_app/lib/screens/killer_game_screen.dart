@@ -6,6 +6,7 @@ import '../utils/killer_game_utils.dart';
 import '../services/killer_game_state_service.dart';
 import '../services/killer_game_history_service.dart';
 import '../widgets/interactive_dartboard.dart';
+import '../widgets/dart_icon.dart';
 
 /// Main screen for playing Killer darts game
 class KillerGameScreen extends StatefulWidget {
@@ -434,9 +435,11 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     final currentPlayer = players.isNotEmpty ? players[currentPlayerIndex] : null;
 
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('Killer'),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: SafeArea(
         child: Column(
@@ -447,6 +450,13 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                  ),
+                ),
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: 1.0,
@@ -460,64 +470,66 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
               ),
             ),
             
-            // Current player indicator
+            // Combined current player and dart tracking section
             if (currentPlayer != null && !isGameCompleted)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Card(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Current player name
+                    Text(
                       '${currentPlayer.name}\'s Turn',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                  ),
-                ),
-              ),
-            
-            // Dart tracking display
-            if (!isGameCompleted)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Dart tracking display with dart icons
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           'Darts: ',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         ...List.generate(_maxDartsPerTurn, (index) {
                           if (index < _currentTurnDarts.length) {
                             // Show result of thrown dart
                             final dart = _currentTurnDarts[index];
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 3),
                               child: Container(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
                                   color: dart.isMiss 
-                                      ? Colors.grey[300]
-                                      : dart.playerColor?.withOpacity(0.7),
+                                      ? Theme.of(context).colorScheme.errorContainer
+                                      : dart.playerColor?.withOpacity(0.8),
                                   border: Border.all(
                                     color: dart.isMiss 
-                                        ? Colors.grey[600]! 
+                                        ? Theme.of(context).colorScheme.error
                                         : dart.playerColor!,
                                     width: 2,
                                   ),
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Center(
                                   child: Text(
@@ -526,22 +538,21 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                                         : dart.playerTarget.substring(0, 1).toUpperCase(),
                                     style: TextStyle(
                                       color: dart.isMiss 
-                                          ? Colors.grey[700] 
-                                          : dart.playerColor,
+                                          ? Theme.of(context).colorScheme.onErrorContainer
+                                          : Colors.white,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 12,
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ),
                               ),
                             );
                           } else {
-                            // Show remaining dart icon
+                            // Show remaining dart icon using SVG
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: Icon(
-                                Icons.near_me,
-                                size: 32,
+                              padding: const EdgeInsets.symmetric(horizontal: 3),
+                              child: DartIcon(
+                                size: 36,
                                 color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
                               ),
                             );
@@ -549,7 +560,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                         }),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
             
@@ -561,7 +572,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Multiplier buttons row with selection highlighting and animations
+                    // Multiplier buttons row with strong theme colors
                     Row(
                       children: [
                         Expanded(
@@ -570,50 +581,48 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _selectedMultiplier == 2 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                                    : Theme.of(context).colorScheme.surface,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.primaryContainer,
                                 foregroundColor: _selectedMultiplier == 2
-                                    ? Colors.white
-                                    : Theme.of(context).colorScheme.onSurface,
-                                elevation: _selectedMultiplier == 2 ? 6 : 2,
-                                shadowColor: _selectedMultiplier == 2 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
-                                    : null,
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onPrimaryContainer,
+                                elevation: _selectedMultiplier == 2 ? 8 : 2,
+                                shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                               ),
                               onPressed: isGameCompleted ? null : () => _handleMultiplierTap(2),
                               child: Text(
                                 'x2',
                                 style: TextStyle(
-                                  fontWeight: _selectedMultiplier == 2 ? FontWeight.bold : FontWeight.normal,
-                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _selectedMultiplier == 3 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                                    : Theme.of(context).colorScheme.surface,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.primaryContainer,
                                 foregroundColor: _selectedMultiplier == 3
-                                    ? Colors.white
-                                    : Theme.of(context).colorScheme.onSurface,
-                                elevation: _selectedMultiplier == 3 ? 6 : 2,
-                                shadowColor: _selectedMultiplier == 3 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.5)
-                                    : null,
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onPrimaryContainer,
+                                elevation: _selectedMultiplier == 3 ? 8 : 2,
+                                shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                               ),
                               onPressed: isGameCompleted ? null : () => _handleMultiplierTap(3),
                               child: Text(
                                 'x3',
                                 style: TextStyle(
-                                  fontWeight: _selectedMultiplier == 3 ? FontWeight.bold : FontWeight.normal,
-                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
                                 ),
                               ),
                             ),
@@ -622,114 +631,55 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     
-                    // Player/Target buttons with smart enabling
+                    // Player/Target buttons - only show enabled ones
                     Expanded(
-                      child: GridView.builder(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          childAspectRatio: 2.5,
-                        ),
-                        itemCount: players.length,
-                        itemBuilder: (context, index) {
-                          final player = players[index];
-                          final color = KillerGameUtils.getPlayerColor(index);
-                          final currentPlayer = players[currentPlayerIndex];
-                          
-                          // Smart button enabling logic
-                          bool isEnabled = false;
-                          String buttonText = player.name;
-                          Color backgroundColor = color.withOpacity(0.2);
-                          Color foregroundColor = color;
-                          
-                          if (isGameCompleted || player.isEliminated) {
-                            // Game over or player eliminated
-                            isEnabled = false;
-                            backgroundColor = Colors.grey.withOpacity(0.1);
-                            foregroundColor = Colors.grey;
-                          } else if (index == currentPlayerIndex) {
-                            // Current player's own button
-                            if (!currentPlayer.isKiller) {
-                              // Non-killers can hit their own territory
-                              isEnabled = true;
-                              backgroundColor = color.withOpacity(0.3);
-                              buttonText = '${player.name} (${player.territory.join(', ')})';
-                            } else {
-                              // Killers cannot hit themselves
-                              isEnabled = false;
-                              backgroundColor = color.withOpacity(0.1);
-                              foregroundColor = color.withOpacity(0.5);
-                              buttonText = '${player.name} (Killer)';
-                            }
-                          } else {
-                            // Other player's button
-                            if (currentPlayer.isKiller) {
-                              // Killers can target other players
-                              isEnabled = true;
-                              backgroundColor = color.withOpacity(0.3);
-                              buttonText = '${player.name} (${player.territory.join(', ')})';
-                            } else {
-                              // Non-killers cannot target others
-                              isEnabled = false;
-                              backgroundColor = color.withOpacity(0.1);
-                              foregroundColor = color.withOpacity(0.5);
-                            }
-                          }
-                          
-                          return ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: backgroundColor,
-                              foregroundColor: foregroundColor,
-                              side: BorderSide(color: color.withOpacity(isEnabled ? 1.0 : 0.3)),
-                              elevation: isEnabled ? 2 : 0,
-                            ),
-                            onPressed: isEnabled ? () => _handlePlayerButtonTap(player.name) : null,
-                            child: Text(
-                              buttonText,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        },
-                      ),
+                      child: _buildPlayerButtons(),
                     ),
                     
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     
-                    // Action buttons row with improved theming
+                    // Action buttons row with strong theme colors
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Theme.of(context).colorScheme.error,
+                              foregroundColor: Theme.of(context).colorScheme.onError,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              elevation: 4,
                             ),
                             onPressed: isGameCompleted ? null : () => _handleMissTap(),
-                            icon: const Icon(Icons.close, size: 18),
-                            label: const Text('Miss'),
+                            icon: const Icon(Icons.close, size: 20),
+                            label: Text(
+                              'Miss',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                              foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Theme.of(context).colorScheme.secondary,
+                              foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              elevation: 4,
                             ),
                             onPressed: (isGameCompleted || _currentTurnDarts.isEmpty) ? null : () => _handleUndoTap(),
-                            icon: const Icon(Icons.undo, size: 18),
-                            label: const Text('Undo'),
+                            icon: const Icon(Icons.undo, size: 20),
+                            label: Text(
+                              'Undo',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -867,74 +817,87 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     });
   }
 
-  /// Get player status description
-  String _getPlayerStatus(KillerPlayer player) {
-    if (player.isEliminated) {
-      return 'ELIMINATED';
-    } else if (player.isKiller) {
-      return 'KILLER';
-    } else {
-      return 'Building (${player.health}/3)';
+  /// Build player buttons - only show enabled ones
+  Widget _buildPlayerButtons() {
+    final currentPlayer = players[currentPlayerIndex];
+    List<Widget> enabledButtons = [];
+    
+    for (int index = 0; index < players.length; index++) {
+      final player = players[index];
+      final color = KillerGameUtils.getPlayerColor(index);
+      
+      // Smart button enabling logic
+      bool isEnabled = false;
+      
+      if (isGameCompleted || player.isEliminated) {
+        // Skip game over or player eliminated
+        continue;
+      } else if (index == currentPlayerIndex) {
+        // Current player's own button
+        if (!currentPlayer.isKiller) {
+          // Non-killers can hit their own territory
+          isEnabled = true;
+        } else {
+          // Killers cannot hit themselves - skip
+          continue;
+        }
+      } else {
+        // Other player's button
+        if (currentPlayer.isKiller) {
+          // Killers can target other players
+          isEnabled = true;
+        } else {
+          // Non-killers cannot target others - skip
+          continue;
+        }
+      }
+      
+      if (isEnabled) {
+        enabledButtons.add(
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                elevation: 6,
+                shadowColor: color.withOpacity(0.5),
+              ),
+              onPressed: () => _handlePlayerButtonTap(player.name),
+              child: Text(
+                player.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        );
+      }
     }
-  }
-
-  /// Show game information dialog
-  void _showGameInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Game Rules'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'KILLER DARTS RULES:\n\n'
-            '• Each player gets 3 random consecutive numbers as territory\n'
-            '• Players start at 0 health and work UP\n'
-            '• Hit your territory to gain health (3+ = KILLER)\n'
-            '• Killers can eliminate others by hitting their territories\n'
-            '• Multipliers count: Double = 2 hits, Triple = 3 hits\n'
-            '• Players are eliminated when health goes negative\n'
-            '• Last surviving player wins!\n\n'
-            'SCORING:\n'
-            '• Single numbers: 1-20\n'
-            '• Doubles: D1-D20\n'
-            '• Triples: T1-T20\n'
-            '• Bull: BULL (50 points)\n'
-            '• Outer Bull: 25\n',
+    
+    // If no buttons are enabled, show a message
+    if (enabledButtons.isEmpty) {
+      return Center(
+        child: Text(
+          'No targets available',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Got it!'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Pause game (save state and return to menu)
-  void _pauseGame() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pause Game'),
-        content: const Text('Game will be saved. You can resume later from the main menu.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await _saveGameState();
-              if (mounted) {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(); // Return to main menu
-              }
-            },
-            child: const Text('Save & Exit'),
-          ),
-        ],
+      );
+    }
+    
+    // Use a Wrap to dynamically arrange buttons
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: enabledButtons,
       ),
     );
   }

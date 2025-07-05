@@ -402,7 +402,7 @@ class DartboardPainter extends CustomPainter {
     }
   }
 
-  /// Draws clean borders between different player territories
+  /// Draws clean borders around territory areas
   void _drawTerritoryBorders(Canvas canvas, Offset center, double radius) {
     for (final territory in killerTerritories) {
       if (territory.areas.isEmpty) continue;
@@ -416,57 +416,78 @@ class DartboardPainter extends CustomPainter {
       
       if (numbers.isEmpty) continue;
       
-      // Find territory boundaries for clean border drawing
       const dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
       
       final borderPaint = Paint()
         ..color = territory.playerColor
-        ..strokeWidth = territory.isKiller ? 6.0 : 4.0
+        ..strokeWidth = territory.isKiller ? 5.0 : 3.0
         ..style = PaintingStyle.stroke;
         
+      // Draw border around each number segment that belongs to this territory
       for (final number in numbers) {
         final segmentIndex = dartboardNumbers.indexOf(number);
         if (segmentIndex == -1) continue;
         
-        // Check if this segment is at a territory boundary
-        final prevIndex = (segmentIndex - 1 + 20) % 20;
-        final nextIndex = (segmentIndex + 1) % 20;
-        final prevNumber = dartboardNumbers[prevIndex];
-        final nextNumber = dartboardNumbers[nextIndex];
+        final startAngle = (segmentIndex * 18 - 9 - 180) * math.pi / 180;
+        final endAngle = (segmentIndex * 18 + 9 - 180) * math.pi / 180;
         
-        final isLeftBoundary = !numbers.contains(prevNumber);
-        final isRightBoundary = !numbers.contains(nextNumber);
-        
-        if (isLeftBoundary || isRightBoundary) {
-          final startAngle = (segmentIndex * 18 - 9 - 180) * math.pi / 180;
-          final endAngle = (segmentIndex * 18 + 9 - 180) * math.pi / 180;
-          
-          if (isLeftBoundary) {
-            _drawSegmentBorder(canvas, center, radius, startAngle, borderPaint);
-          }
-          if (isRightBoundary) {
-            _drawSegmentBorder(canvas, center, radius, endAngle, borderPaint);
-          }
-        }
+        // Draw complete border around the number area
+        _drawAreaBorder(canvas, center, radius, startAngle, endAngle, borderPaint);
       }
     }
   }
 
-  /// Draws a radial border line for territory separation
-  void _drawSegmentBorder(Canvas canvas, Offset center, double radius, double angle, Paint paint) {
+  /// Draws a border around a complete dartboard area (number segment)
+  void _drawAreaBorder(Canvas canvas, Offset center, double radius, double startAngle, double endAngle, Paint paint) {
+    final path = Path();
+    
+    // Start from inner edge
     final innerRadius = radius * 0.08;
     final outerRadius = radius * 0.95;
     
-    final innerPoint = Offset(
-      center.dx + innerRadius * math.cos(angle),
-      center.dy + innerRadius * math.sin(angle),
-    );
-    final outerPoint = Offset(
-      center.dx + outerRadius * math.cos(angle),
-      center.dy + outerRadius * math.sin(angle),
+    // Move to start of inner arc
+    path.moveTo(
+      center.dx + math.cos(startAngle + math.pi / 2) * innerRadius,
+      center.dy + math.sin(startAngle + math.pi / 2) * innerRadius,
     );
     
-    canvas.drawLine(innerPoint, outerPoint, paint);
+    // Line to outer edge
+    path.lineTo(
+      center.dx + math.cos(startAngle + math.pi / 2) * outerRadius,
+      center.dy + math.sin(startAngle + math.pi / 2) * outerRadius,
+    );
+    
+    // Arc along outer edge
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: outerRadius),
+      startAngle + math.pi / 2,
+      endAngle - startAngle,
+      false,
+    );
+    
+    // Line back to inner edge
+    path.lineTo(
+      center.dx + math.cos(endAngle + math.pi / 2) * innerRadius,
+      center.dy + math.sin(endAngle + math.pi / 2) * innerRadius,
+    );
+    
+    // Arc along inner edge (reverse direction)
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: innerRadius),
+      endAngle + math.pi / 2,
+      startAngle - endAngle,
+      false,
+    );
+    
+    path.close();
+    
+    // Draw the border only
+    final borderPaint = Paint()
+      ..color = paint.color
+      ..strokeWidth = paint.strokeWidth
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawPath(path, borderPaint);
   }
 
   /// Draws highlight for a specific dartboard area

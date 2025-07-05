@@ -22,7 +22,7 @@ class KillerGameUtils {
 
   /// Generates random territories for the given number of players
   /// Each territory consists of 3 consecutive dartboard numbers
-  /// Ensures no overlap between territories
+  /// Ensures no overlap between territories using smart conflict resolution
   static List<List<int>> getRandomTerritories(int playerCount) {
     if (playerCount < 2 || playerCount > 6) {
       throw ArgumentError('Player count must be between 2 and 6');
@@ -32,27 +32,116 @@ class KillerGameUtils {
     final territories = <List<int>>[];
     final usedNumbers = <int>{};
 
+    // First, try to place territories randomly without conflicts
     for (int i = 0; i < playerCount; i++) {
-      List<int> territory;
-      int attempts = 0;
+      List<int>? territory = _findAvailableTerritory(usedNumbers, random);
       
-      do {
-        // Pick a random starting position
-        final startIndex = random.nextInt(dartboardNumbers.length);
-        territory = _getConsecutiveNumbers(startIndex, 3);
-        attempts++;
-        
-        // Prevent infinite loop in edge cases
-        if (attempts > 100) {
-          throw StateError('Unable to generate non-overlapping territories');
-        }
-      } while (_hasOverlap(territory, usedNumbers));
-
-      territories.add(territory);
-      usedNumbers.addAll(territory);
+      if (territory != null) {
+        territories.add(territory);
+        usedNumbers.addAll(territory);
+      } else {
+        // No clean spot available, use conflict resolution
+        territory = _resolveConflictAndPlace(territories, usedNumbers, random);
+        territories.add(territory);
+        usedNumbers.addAll(territory);
+      }
     }
 
     return territories;
+  }
+
+  /// Finds an available 3-consecutive territory without conflicts
+  static List<int>? _findAvailableTerritory(Set<int> usedNumbers, math.Random random) {
+    // Create a list of all possible starting positions
+    final availableStartPositions = <int>[];
+    
+    for (int startIndex = 0; startIndex < dartboardNumbers.length; startIndex++) {
+      final territory = _getConsecutiveNumbers(startIndex, 3);
+      if (!_hasOverlap(territory, usedNumbers)) {
+        availableStartPositions.add(startIndex);
+      }
+    }
+    
+    if (availableStartPositions.isEmpty) {
+      return null; // No clean spots available
+    }
+    
+    // Pick a random available position
+    final chosenStartIndex = availableStartPositions[random.nextInt(availableStartPositions.length)];
+    return _getConsecutiveNumbers(chosenStartIndex, 3);
+  }
+
+  /// Resolves conflicts by moving existing territories to make space
+  static List<int> _resolveConflictAndPlace(List<List<int>> existingTerritories, Set<int> usedNumbers, math.Random random) {
+    // Find the least crowded area on the dartboard
+    final conflictCounts = <int, int>{};
+    
+    // Count how many territories would conflict with each possible position
+    for (int startIndex = 0; startIndex < dartboardNumbers.length; startIndex++) {
+      final territory = _getConsecutiveNumbers(startIndex, 3);
+      final conflicts = territory.where((num) => usedNumbers.contains(num)).length;
+      conflictCounts[startIndex] = conflicts;
+    }
+    
+    // Find positions with minimum conflicts
+    final minConflicts = conflictCounts.values.reduce(math.min);
+    final bestPositions = conflictCounts.entries
+        .where((entry) => entry.value == minConflicts)
+        .map((entry) => entry.key)
+        .toList();
+    
+    // Pick a random best position
+    final chosenStartIndex = bestPositions[random.nextInt(bestPositions.length)];
+    final newTerritory = _getConsecutiveNumbers(chosenStartIndex, 3);
+    
+    // Now we need to move conflicting territories
+    final conflictingNumbers = newTerritory.where((num) => usedNumbers.contains(num)).toSet();
+    
+    if (conflictingNumbers.isNotEmpty) {
+      // Find which territories need to be moved
+      final territoriesToMove = <int>[];
+      for (int i = 0; i < existingTerritories.length; i++) {
+        if (existingTerritories[i].any((num) => conflictingNumbers.contains(num))) {
+          territoriesToMove.add(i);
+        }
+      }
+      
+      // Remove conflicting territories from used numbers
+      for (final territoryIndex in territoriesToMove) {
+        for (final num in existingTerritories[territoryIndex]) {
+          usedNumbers.remove(num);
+        }
+      }
+      
+      // Relocate conflicting territories
+      for (final territoryIndex in territoriesToMove) {
+        final relocatedTerritory = _findAvailableTerritory(usedNumbers, random);
+        if (relocatedTerritory != null) {
+          existingTerritories[territoryIndex] = relocatedTerritory;
+          usedNumbers.addAll(relocatedTerritory);
+        } else {
+          // If we still can't place it, use a single number fallback
+          final availableSingle = _findAvailableSingleNumber(usedNumbers, random);
+          existingTerritories[territoryIndex] = [availableSingle];
+          usedNumbers.add(availableSingle);
+        }
+      }
+    }
+    
+    return newTerritory;
+  }
+
+  /// Finds a single available number when no 3-consecutive spots are available
+  static int _findAvailableSingleNumber(Set<int> usedNumbers, math.Random random) {
+    final availableNumbers = dartboardNumbers.where((num) => !usedNumbers.contains(num)).toList();
+    
+    if (availableNumbers.isEmpty) {
+      // This should never happen with 6 players max (18 numbers used, 2 free)
+      // But as a fallback, pick any number
+      return dartboardNumbers[random.nextInt(dartboardNumbers.length)];
+    }
+    
+    return availableNumbers[random.nextInt(availableNumbers.length)];
   }
 
   /// Gets consecutive numbers from the dartboard starting at the given index
