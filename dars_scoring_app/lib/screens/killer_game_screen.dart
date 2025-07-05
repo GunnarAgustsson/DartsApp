@@ -39,6 +39,10 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   // New state for button-based input
   int _selectedMultiplier = 1;
   String? _pendingTargetPlayer;
+  
+  // Dart tracking state
+  List<DartResult> _currentTurnDarts = [];
+  final int _maxDartsPerTurn = 3;
 
   @override
   void initState() {
@@ -161,10 +165,8 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       final activePlayers = players.where((p) => !p.isEliminated).toList();
       if (activePlayers.length <= 1) {
         _completeGame(activePlayers.isNotEmpty ? activePlayers.first.name : 'No winner');
-      } else {
-        // Move to next player
-        _nextPlayer();
       }
+      // Note: We don't automatically move to next player here anymore - controlled by turn completion
     });
 
     // Clear input and save state
@@ -414,6 +416,79 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
                 ),
               ),
             
+            // Dart tracking display
+            if (!isGameCompleted)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Darts: ',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ...List.generate(_maxDartsPerTurn, (index) {
+                          if (index < _currentTurnDarts.length) {
+                            // Show result of thrown dart
+                            final dart = _currentTurnDarts[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: dart.isMiss 
+                                      ? Colors.grey[300]
+                                      : dart.playerColor?.withOpacity(0.7),
+                                  border: Border.all(
+                                    color: dart.isMiss 
+                                        ? Colors.grey[600]! 
+                                        : dart.playerColor!,
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    dart.isMiss 
+                                        ? 'M' 
+                                        : dart.playerTarget.substring(0, 1).toUpperCase(),
+                                    style: TextStyle(
+                                      color: dart.isMiss 
+                                          ? Colors.grey[700] 
+                                          : dart.playerColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          } else {
+                            // Show remaining dart icon
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: Icon(
+                                Icons.near_me,
+                                size: 32,
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                              ),
+                            );
+                          }
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            
             // Control buttons section - takes up bottom portion
             Expanded(
               flex: 4,
@@ -597,12 +672,15 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   }
 
   void _handlePlayerButtonTap(String playerName) {
+    // Don't allow more than 3 darts per turn
+    if (_currentTurnDarts.length >= _maxDartsPerTurn) return;
+    
     // Construct the dart hit based on the target player and current multiplier
     final targetPlayer = players.firstWhere((p) => p.name == playerName);
+    final targetPlayerIndex = players.indexWhere((p) => p.name == playerName);
+    final targetColor = KillerGameUtils.getPlayerColor(targetPlayerIndex);
     
     // Determine which territory number to hit
-    // For now, we'll hit the first number in their territory
-    // In a real game, the player would specify which number they actually hit
     final targetNumber = targetPlayer.territory.first;
     
     String dartScore;
@@ -614,6 +692,11 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       dartScore = 'T$targetNumber';
     }
     
+    // Add to dart tracking
+    setState(() {
+      _currentTurnDarts.add(DartResult.hit(playerName, _selectedMultiplier, targetColor));
+    });
+    
     // Process the dart
     _processDart(dartScore);
     
@@ -621,9 +704,22 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     setState(() {
       _selectedMultiplier = 1;
     });
+    
+    // Check if turn is complete (3 darts or game ended)
+    if (_currentTurnDarts.length >= _maxDartsPerTurn || isGameCompleted) {
+      _completeTurn();
+    }
   }
 
   void _handleMissTap() {
+    // Don't allow more than 3 darts per turn
+    if (_currentTurnDarts.length >= _maxDartsPerTurn) return;
+    
+    // Add to dart tracking
+    setState(() {
+      _currentTurnDarts.add(DartResult.miss());
+    });
+    
     // Process a miss (score 0)
     _processMiss();
     
@@ -631,6 +727,11 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     setState(() {
       _selectedMultiplier = 1;
     });
+    
+    // Check if turn is complete
+    if (_currentTurnDarts.length >= _maxDartsPerTurn) {
+      _completeTurn();
+    }
   }
 
   void _handleUndoTap() {
@@ -647,13 +748,20 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   void _processMiss() {
     setState(() {
       totalDartsThrown++;
-      
-      // Move to next player
-      _nextPlayer();
     });
 
-    // Save state
+    // Save state but don't automatically move to next player
     _saveGameState();
+  }
+
+  /// Complete the current turn and move to next player
+  void _completeTurn() {
+    setState(() {
+      _currentTurnDarts.clear();
+      if (!isGameCompleted) {
+        _nextPlayer();
+      }
+    });
   }
 
   /// Get player status description
@@ -725,6 +833,44 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Represents the result of a single dart throw for display purposes
+class DartResult {
+  final String playerTarget;
+  final int multiplier;
+  final bool isHit;
+  final bool isMiss;
+  final Color? playerColor;
+
+  const DartResult({
+    required this.playerTarget,
+    required this.multiplier,
+    required this.isHit,
+    required this.isMiss,
+    this.playerColor,
+  });
+
+  /// Creates a dart result for a hit
+  factory DartResult.hit(String playerTarget, int multiplier, Color playerColor) {
+    return DartResult(
+      playerTarget: playerTarget,
+      multiplier: multiplier,
+      isHit: true,
+      isMiss: false,
+      playerColor: playerColor,
+    );
+  }
+
+  /// Creates a dart result for a miss
+  factory DartResult.miss() {
+    return const DartResult(
+      playerTarget: '',
+      multiplier: 1,
+      isHit: false,
+      isMiss: true,
     );
   }
 }
