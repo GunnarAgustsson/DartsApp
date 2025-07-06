@@ -6,7 +6,21 @@ import 'package:dars_scoring_app/theme/index.dart';
 enum OverlaySize { small, medium, large }
 
 /// A widget that shows animated overlays for bust and turn changes
-class OverlayAnimation extends StatelessWidget {
+class OverlayAnimation extends StatelessWidget {  const OverlayAnimation({
+    super.key,
+    required this.showBust,
+    required this.showTurnChange,
+    this.showLetterReceived = false,
+    this.showPlayerEliminated = false,
+    this.bgColor,
+    required this.lastTurnPoints,
+    required this.lastTurnLabels,
+    required this.nextPlayerName,
+    this.letterReceivedPlayer = '',
+    this.letterReceivedLetters = '',
+    this.size = OverlaySize.large,
+    this.animationDuration = const Duration(milliseconds: 300),
+  });
   /// Whether to show the bust overlay
   final bool showBust;
     /// Whether to show the turn change overlay
@@ -39,21 +53,7 @@ class OverlayAnimation extends StatelessWidget {
   final OverlaySize size;
 
   /// Animation duration for this overlay
-  final Duration animationDuration;  const OverlayAnimation({
-    super.key,
-    required this.showBust,
-    required this.showTurnChange,
-    this.showLetterReceived = false,
-    this.showPlayerEliminated = false,
-    this.bgColor,
-    required this.lastTurnPoints,
-    required this.lastTurnLabels,
-    required this.nextPlayerName,
-    this.letterReceivedPlayer = '',
-    this.letterReceivedLetters = '',
-    this.size = OverlaySize.large,
-    this.animationDuration = const Duration(milliseconds: 300),
-  });@override
+  final Duration animationDuration;@override
   Widget build(BuildContext context) {
     // Calculate font sizes based on size variant
     double bustFontSize = 72;
@@ -179,11 +179,6 @@ class OverlayAnimation extends StatelessWidget {
 }
 
 class OverlayWidget extends StatelessWidget {
-  final TraditionalGameController ctrl;
-  final AnimationController bustController;
-  final AnimationController turnController;
-  final Animation<Color?> bustColorAnim;
-  final Animation<Color?> turnColorAnim;
 
   const OverlayWidget({
     super.key,
@@ -193,6 +188,11 @@ class OverlayWidget extends StatelessWidget {
     required this.bustColorAnim,
     required this.turnColorAnim,
   });
+  final TraditionalGameController ctrl;
+  final AnimationController bustController;
+  final AnimationController turnController;
+  final Animation<Color?> bustColorAnim;
+  final Animation<Color?> turnColorAnim;
 
   @override
   Widget build(BuildContext context) {

@@ -3,14 +3,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 /// A widget that displays a dart icon using the app's SVG asset
 class DartIcon extends StatelessWidget {
-  final double size;
-  final Color? color;
 
   const DartIcon({
     super.key,
     this.size = 24.0,
     this.color,
   });
+  final double size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {

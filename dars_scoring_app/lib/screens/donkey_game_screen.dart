@@ -14,10 +14,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// Failed attempts earn letters (D-O-N-K-E-Y)
 /// First player to spell DONKEY loses
 class DonkeyGameScreen extends StatefulWidget {
-  final List<String> players;
-  final DonkeyGameHistory? gameHistory;
-  final bool randomOrder;
-  final DonkeyVariant variant;
 
   const DonkeyGameScreen({
     super.key,
@@ -26,6 +22,10 @@ class DonkeyGameScreen extends StatefulWidget {
     this.randomOrder = false,
     this.variant = DonkeyVariant.oneDart,
   });
+  final List<String> players;
+  final DonkeyGameHistory? gameHistory;
+  final bool randomOrder;
+  final DonkeyVariant variant;
 
   @override
   State<DonkeyGameScreen> createState() => _DonkeyGameScreenState();
@@ -95,7 +95,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
               _ctrl.clearPlayerFinishedFlag();
               _hasShownFinishDialog = false;
             },
-            child: Text('Continue'),
+            child: const Text('Continue'),
           ),
           TextButton(
             onPressed: () {
@@ -124,13 +124,13 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                 ),
               );
             },
-            child: Text('Play Again'),
+            child: const Text('Play Again'),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
-            child: Text('Main Menu'),
+            child: const Text('Main Menu'),
           ),
         ],
       ),
@@ -674,7 +674,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                 padding: const EdgeInsets.all(AppDimensions.paddingS),
                 child: TextButton(
                   onPressed: () => setState(() => _showPlayerStatus = false),
-                  child: Text('Close'),
+                  child: const Text('Close'),
                 ),
               ),
             ],

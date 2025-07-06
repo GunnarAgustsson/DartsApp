@@ -9,7 +9,7 @@ void main() {
   group('Killer Game Tests', () {
     group('KillerPlayer Model Tests', () {
       test('Player starts with correct initial state', () {
-        final player = KillerPlayer(
+        const player = KillerPlayer(
           name: 'Test Player',
           territory: [20, 1, 18],
           health: 0,
@@ -26,7 +26,7 @@ void main() {
       });
 
       test('Player becomes killer at 3+ health', () {
-        final player = KillerPlayer(
+        const player = KillerPlayer(
           name: 'Test Player',
           territory: [20, 1, 18],
           health: 3,
@@ -39,7 +39,7 @@ void main() {
       });
 
       test('Player is eliminated when health goes negative', () {
-        final player = KillerPlayer(
+        const player = KillerPlayer(
           name: 'Test Player',
           territory: [20, 1, 18],
           health: -1,
@@ -52,7 +52,7 @@ void main() {
       });
 
       test('Player copyWith works correctly', () {
-        final player = KillerPlayer(
+        const player = KillerPlayer(
           name: 'Test Player',
           territory: [20, 1, 18],
           health: 0,
@@ -70,7 +70,7 @@ void main() {
       });
 
       test('Player JSON serialization works correctly', () {
-        final player = KillerPlayer(
+        const player = KillerPlayer(
           name: 'Test Player',
           territory: [20, 1, 18],
           health: 2,
@@ -180,26 +180,26 @@ void main() {
         final territory = [20, 1, 18];
         
         // Test hit that affects territory
-        final hit20 = DartHit(number: 20, multiplier: 1, isBull: false);
+        const hit20 = DartHit(number: 20, multiplier: 1, isBull: false);
         expect(KillerGameUtils.hitAffectsTerritory(hit20, territory), isTrue);
         
         // Test hit that doesn't affect territory
-        final hit5 = DartHit(number: 5, multiplier: 1, isBull: false);
+        const hit5 = DartHit(number: 5, multiplier: 1, isBull: false);
         expect(KillerGameUtils.hitAffectsTerritory(hit5, territory), isFalse);
         
         // Test bull doesn't affect territory
-        final bull = DartHit(number: 50, multiplier: 1, isBull: true);
+        const bull = DartHit(number: 50, multiplier: 1, isBull: true);
         expect(KillerGameUtils.hitAffectsTerritory(bull, territory), isFalse);
       });
 
       test('Hit count calculation works correctly', () {
-        final single = DartHit(number: 20, multiplier: 1, isBull: false);
+        const single = DartHit(number: 20, multiplier: 1, isBull: false);
         expect(KillerGameUtils.calculateHitCount(single), equals(1));
         
-        final double = DartHit(number: 20, multiplier: 2, isBull: false);
+        const double = DartHit(number: 20, multiplier: 2, isBull: false);
         expect(KillerGameUtils.calculateHitCount(double), equals(2));
         
-        final triple = DartHit(number: 20, multiplier: 3, isBull: false);
+        const triple = DartHit(number: 20, multiplier: 3, isBull: false);
         expect(KillerGameUtils.calculateHitCount(triple), equals(3));
       });
 
@@ -215,8 +215,8 @@ void main() {
     group('KillerGameHistory Tests', () {
       test('KillerGameHistory creation from game data works correctly', () {
         final players = [
-          KillerPlayer(name: 'Player1', territory: [20, 1, 18], health: 3, isKiller: true, hitCount: 3),
-          KillerPlayer(name: 'Player2', territory: [4, 13, 6], health: -1, isKiller: false, hitCount: 2),
+          const KillerPlayer(name: 'Player1', territory: [20, 1, 18], health: 3, isKiller: true, hitCount: 3),
+          const KillerPlayer(name: 'Player2', territory: [4, 13, 6], health: -1, isKiller: false, hitCount: 2),
         ];
         
         final gameStartTime = DateTime.now().subtract(const Duration(minutes: 10));
@@ -291,7 +291,7 @@ void main() {
     group('Killer Player Statuses', () {
       test('Killer status progression works correctly', () {
         // Health 0-2: Building
-        var player = KillerPlayer(name: 'Test', territory: [20, 1, 18], health: 0, isKiller: false, hitCount: 0);
+        var player = const KillerPlayer(name: 'Test', territory: [20, 1, 18], health: 0, isKiller: false, hitCount: 0);
         expect(player.isEliminated, isFalse);
         expect(player.isKiller, isFalse);
         

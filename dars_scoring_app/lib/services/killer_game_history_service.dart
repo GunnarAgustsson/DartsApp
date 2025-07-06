@@ -120,12 +120,6 @@ class KillerGameHistoryService {
 
 /// Statistics for Killer games
 class KillerGameStats {
-  final int totalGames;
-  final int totalDartsThrown;
-  final double averageDartsPerGame;
-  final Duration averageGameDuration;
-  final String? mostSuccessfulPlayer;
-  final int mostWins;
 
   const KillerGameStats({
     required this.totalGames,
@@ -146,4 +140,10 @@ class KillerGameStats {
       mostWins: 0,
     );
   }
+  final int totalGames;
+  final int totalDartsThrown;
+  final double averageDartsPerGame;
+  final Duration averageGameDuration;
+  final String? mostSuccessfulPlayer;
+  final int mostWins;
 }

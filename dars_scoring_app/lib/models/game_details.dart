@@ -7,10 +7,6 @@ import '../data/possible_finishes.dart';
 
 /// Details for setting up a traditional game (301, 501, 1001)
 class PlayerSelectionDetails {
-  final List<String> players;
-  final CheckoutRule checkoutRule;
-  final int startingScore;
-  final bool randomOrder;
 
   const PlayerSelectionDetails({
     required this.players,
@@ -18,6 +14,10 @@ class PlayerSelectionDetails {
     required this.startingScore,
     required this.randomOrder,
   });
+  final List<String> players;
+  final CheckoutRule checkoutRule;
+  final int startingScore;
+  final bool randomOrder;
 
   /// Create a copy with updated values
   PlayerSelectionDetails copyWith({
@@ -42,15 +42,15 @@ class PlayerSelectionDetails {
 
 /// Details for setting up a Cricket game
 class CricketGameDetails {
-  final List<String> players;
-  final CricketVariant variant;
-  final bool randomOrder;
 
   const CricketGameDetails({
     required this.players,
     required this.variant,
     required this.randomOrder,
   });
+  final List<String> players;
+  final CricketVariant variant;
+  final bool randomOrder;
 
   /// Create a copy with updated values
   CricketGameDetails copyWith({
@@ -72,15 +72,15 @@ class CricketGameDetails {
 
 /// Details for setting up a Donkey game
 class DonkeyGameDetails {
-  final List<String> players;
-  final DonkeyVariant variant;
-  final bool randomOrder;
 
   const DonkeyGameDetails({
     required this.players,
     required this.variant,
     required this.randomOrder,
   });
+  final List<String> players;
+  final DonkeyVariant variant;
+  final bool randomOrder;
 
   /// Create a copy with updated values
   DonkeyGameDetails copyWith({
@@ -103,13 +103,13 @@ class DonkeyGameDetails {
 
 /// Details for setting up a Killer game
 class KillerGameDetails {
-  final List<String> players;
-  final bool randomOrder;
 
   const KillerGameDetails({
     required this.players,
     required this.randomOrder,
   });
+  final List<String> players;
+  final bool randomOrder;
 
   /// Create a copy with updated values
   KillerGameDetails copyWith({

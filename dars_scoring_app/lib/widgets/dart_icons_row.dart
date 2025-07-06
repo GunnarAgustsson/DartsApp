@@ -4,14 +4,14 @@ import 'package:dars_scoring_app/services/traditional_game_service.dart';
 
 /// Renders the last darts thrown as text labels and blank dart icons for remaining throws.
 class DartIconsRow extends StatelessWidget {
-  final TraditionalGameController ctrl;
-  final double iconSize;
 
   const DartIconsRow({
     Key? key,
     required this.ctrl,
     this.iconSize = 32,
   }) : super(key: key);
+  final TraditionalGameController ctrl;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {

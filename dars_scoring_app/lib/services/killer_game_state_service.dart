@@ -81,6 +81,29 @@ class KillerGameStateService {
 
 /// Represents the complete state of a Killer game for persistence
 class KillerGameState {
+
+  const KillerGameState({
+    required this.players,
+    required this.currentPlayerIndex,
+    required this.gameStartTime,
+    required this.totalDartsThrown,
+    required this.isCompleted,
+    this.winner,
+  });
+
+  /// Creates a KillerGameState from JSON
+  factory KillerGameState.fromJson(Map<String, dynamic> json) {
+    return KillerGameState(
+      players: (json['players'] as List)
+          .map((playerJson) => KillerPlayer.fromJson(playerJson))
+          .toList(),
+      currentPlayerIndex: json['currentPlayerIndex'] as int,
+      gameStartTime: DateTime.parse(json['gameStartTime'] as String),
+      totalDartsThrown: json['totalDartsThrown'] as int,
+      isCompleted: json['isCompleted'] as bool,
+      winner: json['winner'] as String?,
+    );
+  }
   /// List of all players with their current state
   final List<KillerPlayer> players;
   
@@ -98,15 +121,6 @@ class KillerGameState {
   
   /// Winner's name (if game is completed)
   final String? winner;
-
-  const KillerGameState({
-    required this.players,
-    required this.currentPlayerIndex,
-    required this.gameStartTime,
-    required this.totalDartsThrown,
-    required this.isCompleted,
-    this.winner,
-  });
 
   /// Creates a copy with updated properties
   KillerGameState copyWith({
@@ -151,20 +165,6 @@ class KillerGameState {
       'isCompleted': isCompleted,
       'winner': winner,
     };
-  }
-
-  /// Creates a KillerGameState from JSON
-  factory KillerGameState.fromJson(Map<String, dynamic> json) {
-    return KillerGameState(
-      players: (json['players'] as List)
-          .map((playerJson) => KillerPlayer.fromJson(playerJson))
-          .toList(),
-      currentPlayerIndex: json['currentPlayerIndex'] as int,
-      gameStartTime: DateTime.parse(json['gameStartTime'] as String),
-      totalDartsThrown: json['totalDartsThrown'] as int,
-      isCompleted: json['isCompleted'] as bool,
-      winner: json['winner'] as String?,
-    );
   }
 
   @override

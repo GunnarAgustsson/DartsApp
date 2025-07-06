@@ -14,8 +14,8 @@ enum HitTypeFilter { all, singles, doubles, triples }
 enum DartCountFilter { all, first9, first12 }
 
 class PlayerInfoScreen extends StatefulWidget {
-  final String playerName;
   const PlayerInfoScreen({super.key, required this.playerName});
+  final String playerName;
 
   @override
   State<PlayerInfoScreen> createState() => _PlayerInfoScreenState();
@@ -48,7 +48,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
     // New statistics
   double _first9Average = 0.0;
   double _checkoutEfficiency = 0.0;
-  String _favoriteCheckout = "";
+  String _favoriteCheckout = '';
   double _consistencyRating = 0.0;
   int _largestRoundScore = 0;
   int _largestBustScore = 0;
@@ -118,7 +118,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         final dartsThrown = throws.length;
         if (dartsThrown > 0 && dartsThrown < minDarts) {
           minDarts = dartsThrown;
-          print("Found new best leg: $minDarts darts"); // Debug info
+          print('Found new best leg: $minDarts darts'); // Debug info
         }
       }
 
@@ -134,7 +134,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
           
           if (checkout > maxCheckout) {
             maxCheckout = checkout;
-            print("Found checkout: $checkout"); // Debug to verify checkouts are found
+            print('Found checkout: $checkout'); // Debug to verify checkouts are found
           }
         }
       }
@@ -268,7 +268,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
             // Update highest checkout
             if (checkout > maxCheckout) {
               maxCheckout = checkout.toDouble();
-              print("Found checkout: $checkout"); // Debug
+              print('Found checkout: $checkout'); // Debug
             }
           }
         }
@@ -346,10 +346,10 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         final resultingScore = lastThrow['resultingScore'] as int?;
         
         // Add debug logging
-        print("Player: ${widget.playerName}, Last throw score: $resultingScore");
+        print('Player: ${widget.playerName}, Last throw score: $resultingScore');
         
         if (resultingScore == 0) {
-          print("FOUND A CHECKOUT!");
+          print('FOUND A CHECKOUT!');
           // Record checkout route (ONLY the last dart)
           final v = lastThrow['value'] as int? ?? 0;
           final m = lastThrow['multiplier'] as int? ?? 1;
@@ -368,7 +368,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
           }
           
           // For debugging
-          print("Recording checkout route (single dart): $route");
+          print('Recording checkout route (single dart): $route');
           checkoutRoutes[route] = (checkoutRoutes[route] ?? 0) + 1;
         }
       }
@@ -401,7 +401,7 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
         : 0.0;
     
     // Favorite Checkout
-    String favoriteRoute = "";
+    String favoriteRoute = '';
     int maxCount = 0;
     checkoutRoutes.forEach((route, count) {
       if (count > maxCount) {
@@ -1671,9 +1671,6 @@ class _PlayerInfoScreenState extends State<PlayerInfoScreen> with SingleTickerPr
 
 // Custom widget needed for the circle segments
 class SegmentedCircle extends StatelessWidget {
-  final Map<String, double> segments;
-  final double radius;
-  final Map<String, Color> colors;
   
   const SegmentedCircle({
     super.key,
@@ -1681,6 +1678,9 @@ class SegmentedCircle extends StatelessWidget {
     required this.radius,
     required this.colors,
   });
+  final Map<String, double> segments;
+  final double radius;
+  final Map<String, Color> colors;
 
   @override
   Widget build(BuildContext context) {
@@ -1698,13 +1698,13 @@ class SegmentedCircle extends StatelessWidget {
 }
 
 class SegmentedCirclePainter extends CustomPainter {
-  final Map<String, double> segments;
-  final Map<String, Color> colors;
   
   SegmentedCirclePainter({
     required this.segments,
     required this.colors,
   });
+  final Map<String, double> segments;
+  final Map<String, Color> colors;
 
   @override
   void paint(Canvas canvas, Size size) {

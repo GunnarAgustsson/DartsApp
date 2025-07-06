@@ -5,6 +5,21 @@ enum ScoreButtonSize { small, medium, large, custom }
 
 /// A button used for scoring in the dart game
 class ScoreButton extends StatelessWidget {
+
+  const ScoreButton({
+    super.key,
+    required this.value,
+    this.label,
+    this.disabled = false,
+    this.fontSize,
+    this.size = ScoreButtonSize.medium,
+    this.customSize,
+    this.isHighValue = false,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderRadius,
+    required this.onPressed,
+  });
   /// The numeric value of this button
   final int value;
   
@@ -37,21 +52,6 @@ class ScoreButton extends StatelessWidget {
 
   /// Optional border radius override
   final double? borderRadius;
-
-  const ScoreButton({
-    super.key,
-    required this.value,
-    this.label,
-    this.disabled = false,
-    this.fontSize,
-    this.size = ScoreButtonSize.medium,
-    this.customSize,
-    this.isHighValue = false,
-    this.backgroundColor,
-    this.foregroundColor,
-    this.borderRadius,
-    required this.onPressed,
-  });
   
   @override
   Widget build(BuildContext context) {

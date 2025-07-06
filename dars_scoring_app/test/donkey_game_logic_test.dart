@@ -69,7 +69,7 @@ void main() {
 
     test('should format letters correctly for display', () {
       // Create a player with some letters
-      final playerState = DonkeyPlayerState(name: 'Test', letters: 'DON');
+      const playerState = DonkeyPlayerState(name: 'Test', letters: 'DON');
       final displayLetters = playerState.letters.split('').join('-');
       
       expect(displayLetters, 'D-O-N');

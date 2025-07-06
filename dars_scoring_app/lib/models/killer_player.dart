@@ -2,6 +2,25 @@ import 'package:flutter/material.dart';
 
 /// Represents a player in a Killer darts game
 class KillerPlayer {
+
+  const KillerPlayer({
+    required this.name,
+    required this.territory,
+    this.health = 3,
+    this.isKiller = false,
+    this.hitCount = 0,
+  });
+
+  /// Creates a KillerPlayer from a JSON map
+  factory KillerPlayer.fromJson(Map<String, dynamic> json) {
+    return KillerPlayer(
+      name: json['name'],
+      territory: List<int>.from(json['territory']),
+      health: json['health'],
+      isKiller: json['isKiller'],
+      hitCount: json['hitCount'],
+    );
+  }
   /// Player's name
   final String name;
   
@@ -16,14 +35,6 @@ class KillerPlayer {
   
   /// Number of times the player has hit their own territory
   final int hitCount;
-
-  const KillerPlayer({
-    required this.name,
-    required this.territory,
-    this.health = 3,
-    this.isKiller = false,
-    this.hitCount = 0,
-  });
 
   /// Creates a copy of this player with updated properties
   KillerPlayer copyWith({
@@ -59,17 +70,6 @@ class KillerPlayer {
     };
   }
 
-  /// Creates a KillerPlayer from a JSON map
-  factory KillerPlayer.fromJson(Map<String, dynamic> json) {
-    return KillerPlayer(
-      name: json['name'],
-      territory: List<int>.from(json['territory']),
-      health: json['health'],
-      isKiller: json['isKiller'],
-      hitCount: json['hitCount'],
-    );
-  }
-
   @override
   String toString() {
     return 'KillerPlayer(name: $name, territory: $territory, health: $health, isKiller: $isKiller, hitCount: $hitCount)';
@@ -95,6 +95,20 @@ class KillerPlayer {
 
 /// Represents visual territory information for dartboard rendering
 class KillerPlayerTerritory {
+
+  const KillerPlayerTerritory({
+    required this.playerName,
+    required this.areas,
+    required this.playerColor,
+    this.highlightOpacity = 0.6,
+    this.isEliminated = false,
+    this.isKiller = false,
+    this.isCurrentPlayer = false,
+    this.borderOnly = false,
+    this.fillPercentage = 1.0,
+    this.pulseIntensity = 0.0,
+    this.showPlayerName = false,
+  });
   /// Player's name
   final String playerName;
   
@@ -127,20 +141,6 @@ class KillerPlayerTerritory {
   
   /// Whether to show player name on territory
   final bool showPlayerName;
-
-  const KillerPlayerTerritory({
-    required this.playerName,
-    required this.areas,
-    required this.playerColor,
-    this.highlightOpacity = 0.6,
-    this.isEliminated = false,
-    this.isKiller = false,
-    this.isCurrentPlayer = false,
-    this.borderOnly = false,
-    this.fillPercentage = 1.0,
-    this.pulseIntensity = 0.0,
-    this.showPlayerName = false,
-  });
 
   /// Creates a copy with updated properties
   KillerPlayerTerritory copyWith({

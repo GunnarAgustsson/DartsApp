@@ -11,6 +11,15 @@ typedef OnUndoCallback = void Function();
 
 /// Configuration for the scoring buttons widget
 class ScoringButtonsConfig {
+
+  const ScoringButtonsConfig({
+    this.showMultipliers = true,
+    this.show25Button = true,
+    this.showBullButton = true,
+    this.showMissButton = true,
+    this.showUndoButton = true,
+    this.disabled = false,
+  });
   /// Whether to show multiplier buttons (x2, x3)
   final bool showMultipliers;
   
@@ -28,20 +37,18 @@ class ScoringButtonsConfig {
   
   /// Whether the interface is disabled
   final bool disabled;
-
-  const ScoringButtonsConfig({
-    this.showMultipliers = true,
-    this.show25Button = true,
-    this.showBullButton = true,
-    this.showMissButton = true,
-    this.showUndoButton = true,
-    this.disabled = false,
-  });
 }
 
 /// A reusable widget that provides all scoring functionality for dart games
 /// Includes number buttons (1-20), multipliers (x2, x3), special buttons (25, Bull), and action buttons (Miss, Undo)
 class ScoringButtons extends StatefulWidget {
+
+  const ScoringButtons({
+    super.key,
+    required this.config,
+    required this.onScore,
+    this.onUndo,
+  });
   /// Configuration for what buttons to show and their states
   final ScoringButtonsConfig config;
   
@@ -50,13 +57,6 @@ class ScoringButtons extends StatefulWidget {
   
   /// Callback when undo is pressed
   final OnUndoCallback? onUndo;
-
-  const ScoringButtons({
-    super.key,
-    required this.config,
-    required this.onScore,
-    this.onUndo,
-  });
 
   @override
   State<ScoringButtons> createState() => _ScoringButtonsState();

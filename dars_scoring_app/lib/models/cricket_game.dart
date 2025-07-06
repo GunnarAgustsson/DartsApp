@@ -1,10 +1,4 @@
 class CricketThrow {
-  final String player;
-  final int value; // 20, 19, 18, 17, 16, 15, or 25 (bull)
-  final int multiplier; // 1, 2, or 3
-  final DateTime timestamp;
-  final int hits; // How many hits this throw gives (multiplier)
-  final bool wasBust;
 
   CricketThrow({
     required this.player,
@@ -13,6 +7,12 @@ class CricketThrow {
     required this.timestamp,
     this.wasBust = false,
   }) : hits = multiplier;
+  final String player;
+  final int value; // 20, 19, 18, 17, 16, 15, or 25 (bull)
+  final int multiplier; // 1, 2, or 3
+  final DateTime timestamp;
+  final int hits; // How many hits this throw gives (multiplier)
+  final bool wasBust;
 
   Map<String, dynamic> toJson() => {
         'player': player,
@@ -33,6 +33,8 @@ class CricketThrow {
 }
 
 class CricketPlayerState {
+
+  CricketPlayerState(this.name);
   final String name;
   int score = 0;
   
@@ -46,8 +48,6 @@ class CricketPlayerState {
     15: 0,
     25: 0, // Bull
   };
-
-  CricketPlayerState(this.name);
 
   // Check if a number is closed (3 or more hits)
   bool isNumberClosed(int number) => hits[number]! >= 3;
@@ -82,17 +82,6 @@ class CricketPlayerState {
 }
 
 class CricketGameHistory {
-  final String id;
-  final List<String> players;
-  DateTime createdAt, modifiedAt;
-  final List<CricketThrow> throws;
-  String? winner;
-  DateTime? completedAt;
-  final String gameMode = 'Cricket'; // Always Cricket
-
-  int currentPlayer;
-  int dartsThrown;
-  final Map<String, CricketPlayerState> playerStates;
 
   CricketGameHistory({
     required this.id,
@@ -108,23 +97,6 @@ class CricketGameHistory {
   }) : playerStates = playerStates ?? {
           for (String player in players) player: CricketPlayerState(player)
         };
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'players': players,
-        'createdAt': createdAt.toIso8601String(),
-        'modifiedAt': modifiedAt.toIso8601String(),
-        'throws': throws.map((t) => t.toJson()).toList(),
-        'winner': winner,
-        'completedAt': completedAt?.toIso8601String(),
-        'gameMode': gameMode,
-        'currentPlayer': currentPlayer,
-        'dartsThrown': dartsThrown,
-        'playerStates': {
-          for (String player in players)
-            player: playerStates[player]!.toJson()
-        },
-      };
 
   factory CricketGameHistory.fromJson(Map<String, dynamic> j) {
     final players = List<String>.from(j['players']);
@@ -159,4 +131,32 @@ class CricketGameHistory {
       playerStates: playerStates,
     );
   }
+  final String id;
+  final List<String> players;
+  DateTime createdAt, modifiedAt;
+  final List<CricketThrow> throws;
+  String? winner;
+  DateTime? completedAt;
+  final String gameMode = 'Cricket'; // Always Cricket
+
+  int currentPlayer;
+  int dartsThrown;
+  final Map<String, CricketPlayerState> playerStates;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'players': players,
+        'createdAt': createdAt.toIso8601String(),
+        'modifiedAt': modifiedAt.toIso8601String(),
+        'throws': throws.map((t) => t.toJson()).toList(),
+        'winner': winner,
+        'completedAt': completedAt?.toIso8601String(),
+        'gameMode': gameMode,
+        'currentPlayer': currentPlayer,
+        'dartsThrown': dartsThrown,
+        'playerStates': {
+          for (String player in players)
+            player: playerStates[player]!.toJson()
+        },
+      };
 }

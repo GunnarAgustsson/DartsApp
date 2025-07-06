@@ -16,11 +16,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 ///  - Miss/Undo row
 ///  - Overlay animations for busts and turn changes
 class GameScreen extends StatefulWidget {
-  final int startingScore;
-  final List<String> players;
-  final GameHistory? gameHistory;
-  final CheckoutRule? checkoutRule;
-  final bool randomOrder;
 
   const GameScreen({
     super.key,
@@ -30,6 +25,11 @@ class GameScreen extends StatefulWidget {
     this.checkoutRule,
     this.randomOrder = false,
   });
+  final int startingScore;
+  final List<String> players;
+  final GameHistory? gameHistory;
+  final CheckoutRule? checkoutRule;
+  final bool randomOrder;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -90,15 +90,37 @@ class _GameScreenState extends State<GameScreen>
     final remaining = _ctrl.activePlayers.length;
     final title = remaining > 0
         ? 'Congratulations, $finisher!'
-        : 'Game Over';
+        : '🎉 Game Complete!';
     final content = remaining > 0
         ? Text(
             '$finisher has finished!\nRemaining: ${_ctrl.activePlayers.join(", ")}',
             style: theme.textTheme.bodyMedium,
           )
-        : Text(
-            'All players have finished.',
-            style: theme.textTheme.bodyMedium,
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'All players have finished.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Final Order:',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...widget.players.asMap().entries.map((entry) {
+                final position = entry.key + 1;
+                final player = entry.value;
+                final suffix = position == 1 ? '🥇' : position == 2 ? '🥈' : position == 3 ? '🥉' : '';
+                return Text(
+                  '$position. $player $suffix',
+                  style: theme.textTheme.bodyMedium,
+                );
+              }),
+            ],
           );
 
     return showDialog(
@@ -117,8 +139,19 @@ class _GameScreenState extends State<GameScreen>
                 // allow next finish to show again
                 _hasShownFinishDialog = false;
               },
-            ),          TextButton(
-            child: Text('Play Again', style: theme.textTheme.labelMedium),
+            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+            ),
+            child: Text(
+              'Play Again', 
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             onPressed: () {
               Navigator.of(context).pop();
               
@@ -150,7 +183,7 @@ class _GameScreenState extends State<GameScreen>
             },
           ),
           TextButton(
-            child: Text('Main Menu', style: theme.textTheme.labelMedium),
+            child: Text('Back to Menu', style: theme.textTheme.labelMedium),
             onPressed: () {
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
@@ -176,7 +209,7 @@ class _GameScreenState extends State<GameScreen>
 
     final showBust = _ctrl.showBust;
     final showTurnChange = _ctrl.showTurnChange;
-    final isTurnChanging = _ctrl.isTurnChanging;    // Compute next player index for UI hints
+    final isTurnChanging = _ctrl.isTurnChanging;
 
     // ---- 4) Responsive layout constants ----
     final size = MediaQuery.of(context).size;
@@ -186,20 +219,20 @@ class _GameScreenState extends State<GameScreen>
     
     // Theme
     final theme = Theme.of(context);
-      // Base scale factor for responsive sizing - using height-based scaling now
 
     return Scaffold(
-      // AppBar with home button & game label, plus "Next" toggle
+      backgroundColor: theme.colorScheme.surface,
+      // AppBar with consistent styling like Killer game
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        elevation: AppDimensions.elevationS,
-        // Leading widget: home icon + label (pop to root)
+        title: Text('${widget.startingScore}'),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
+        // Leading widget: home icon (pop to root)
         leading: IconButton(
-          icon: Icon(
-            Icons.home,
-            color: theme.colorScheme.onSurface,
-          ),
-          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),        ),
+          icon: const Icon(Icons.home),
+          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+        ),
         // "Next" button in the AppBar actions
         actions: [
           GestureDetector(
@@ -209,7 +242,9 @@ class _GameScreenState extends State<GameScreen>
               child: Center(
                 child: Text(
                   'Next: ${shortenName(act[nxtIdx], maxLength: 12)} (${actScores[nxtIdx]})',
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                  ),
                 ),
               ),
             ),
@@ -421,7 +456,7 @@ class _GameScreenState extends State<GameScreen>
   ) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final scale = size.width / 390;
+    final isTablet = size.shortestSide >= 600;
     
     return Positioned(
       top: 0,
@@ -429,8 +464,13 @@ class _GameScreenState extends State<GameScreen>
       right: AppDimensions.paddingM,
       child: Card(
         elevation: AppDimensions.elevationM,
+        color: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+          side: BorderSide(
+            color: theme.colorScheme.outline.withOpacity(0.5),
+            width: 1,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -441,29 +481,48 @@ class _GameScreenState extends State<GameScreen>
             final idx = entry.key;
             final name = shortenName(entry.value, maxLength: 12);
             final pts = actScores[idx];
-            final avgScore = _ctrl.averageScoreFor(entry.value).toStringAsFixed(1); // Get average score
+            final avgScore = _ctrl.averageScoreFor(entry.value).toStringAsFixed(1);
             final isCurrent = idx == curIdx;
             final isUpcoming = idx == nxtIdx;
 
-            return ListTile(
-              dense: true,
-              leading: isCurrent
-                  ? Icon(Icons.arrow_right, color: theme.colorScheme.primary)
-                  : SizedBox(width: 24 * scale),
-              title: Text(
-                name,
-                style: TextStyle(
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  color: isUpcoming ? theme.colorScheme.secondary : null,
-                ),
+            return Container(
+              decoration: BoxDecoration(
+                color: isCurrent 
+                    ? theme.colorScheme.primaryContainer.withOpacity(0.5)
+                    : null,
+                borderRadius: BorderRadius.circular(8),
               ),
-              trailing: Text(
-                '$pts (Avg: $avgScore)', // Display current score and average score
-                style: theme.textTheme.titleMedium?.copyWith(
-                   color: isCurrent ? theme.colorScheme.primary : null,
+              child: ListTile(
+                dense: true,
+                leading: isCurrent
+                    ? Icon(
+                        Icons.arrow_right, 
+                        color: theme.colorScheme.primary,
+                        size: isTablet ? 28 : 24,
+                      )
+                    : SizedBox(width: isTablet ? 28 : 24),
+                title: Text(
+                  name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    color: isUpcoming 
+                        ? theme.colorScheme.secondary 
+                        : isCurrent
+                            ? theme.colorScheme.primary
+                            : null,
+                  ),
                 ),
+                trailing: Text(
+                  '$pts (Avg: $avgScore)',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: isCurrent 
+                        ? theme.colorScheme.primary 
+                        : theme.colorScheme.onSurface.withOpacity(0.8),
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                onTap: () => setState(() => _showNextList = false),
               ),
-              onTap: () => setState(() => _showNextList = false),
             );
           }).toList(),
         ),
@@ -483,24 +542,26 @@ class _GameScreenState extends State<GameScreen>
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
     final isLandscape = size.width > size.height;
+    final isTablet = size.shortestSide >= 600;
 
     return Center(
       child: Container(
         width: isLandscape 
             ? double.infinity
             : size.width * 0.9,
-        padding: const EdgeInsets.symmetric(
-          vertical: AppDimensions.paddingM,
-          horizontal: AppDimensions.paddingL,
-        ),
+        padding: EdgeInsets.all(isTablet ? 24 : 20),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+          border: Border.all(
+            color: theme.colorScheme.primary,
+            width: 2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.shadow.withOpacity(0.1),
+              color: theme.colorScheme.primary.withOpacity(0.2),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -520,9 +581,11 @@ class _GameScreenState extends State<GameScreen>
                             fit: BoxFit.contain,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              shortenName(playerName, maxLength: 15),
-                              style: theme.textTheme.headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              '${shortenName(playerName, maxLength: 15)}\'s Turn',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
                             ),
                           ),
                         ),
@@ -532,14 +595,16 @@ class _GameScreenState extends State<GameScreen>
                             alignment: Alignment.centerLeft,
                             child: Text(
                               'Avg: ${average.toStringAsFixed(1)}',
-                              style: theme.textTheme.titleMedium,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     )
                   : Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           flex: 3,
@@ -547,9 +612,12 @@ class _GameScreenState extends State<GameScreen>
                             fit: BoxFit.contain,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              shortenName(playerName, maxLength: 15),
+                              '${shortenName(playerName, maxLength: 15)}\'s Turn',
                               textAlign: TextAlign.left,
-                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
                             ),
                           ),
                         ),
@@ -561,7 +629,9 @@ class _GameScreenState extends State<GameScreen>
                             alignment: Alignment.centerRight,
                             child: Text(
                               'Avg: ${average.toStringAsFixed(1)}',
-                              style: theme.textTheme.titleMedium,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer,
+                              ),
                             ),
                           ),
                         ),
@@ -595,9 +665,7 @@ class _GameScreenState extends State<GameScreen>
                   child: Text(
                     'Finish: $finish',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70
-                          : Colors.black87,
+                      color: theme.colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -606,51 +674,77 @@ class _GameScreenState extends State<GameScreen>
             
             if (finish != null) const SizedBox(height: AppDimensions.marginS),
 
-            // Darts left icons
+            // Darts left icons with improved styling
             Expanded(
               flex: 1,
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (index) {
-                    final isThrown = index < dartsThrownInTurn;
-                    final dartLabels = _ctrl.currentTurnDartLabels;
-                    final label = isThrown && index < dartLabels.length
-                        ? dartLabels[index]
-                        : null;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/dart-icon.svg',
-                            width: 24,
-                            height: 24,
-                            colorFilter: ColorFilter.mode(
-                              isThrown
-                                  ? theme.colorScheme.onSurface
-                                      .withOpacity(0.3)
-                                  : theme.colorScheme.onSurface,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                          if (isThrown && label != null)
-                            Text(
-                              label,
-                              style: TextStyle(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacity(0.8),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
+                  children: [
+                    Text(
+                      'Darts: ',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        fontSize: isTablet ? 18 : 16,
                       ),
-                    );
-                  }),
+                    ),
+                    const SizedBox(width: 12),
+                    ...List.generate(3, (index) {
+                      final isThrown = index < dartsThrownInTurn;
+                      final dartLabels = _ctrl.currentTurnDartLabels;
+                      final label = isThrown && index < dartLabels.length
+                          ? dartLabels[index]
+                          : null;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: Container(
+                          width: isTablet ? 32 : 28,
+                          height: isTablet ? 32 : 28,
+                          decoration: BoxDecoration(
+                            color: isThrown
+                                ? theme.colorScheme.primary.withOpacity(0.8)
+                                : theme.colorScheme.primary.withOpacity(0.2),
+                            border: Border.all(
+                              color: theme.colorScheme.primary,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/dart-icon.svg',
+                                width: isTablet ? 20 : 18,
+                                height: isTablet ? 20 : 18,
+                                colorFilter: ColorFilter.mode(
+                                  isThrown
+                                      ? Colors.white
+                                      : theme.colorScheme.primary,
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                              if (isThrown && label != null)
+                                Positioned(
+                                  bottom: 2,
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: isTablet ? 10 : 8,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
                 ),
               ),
             ),

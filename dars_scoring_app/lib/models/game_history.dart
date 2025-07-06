@@ -1,6 +1,15 @@
 /// Represents a single dart throw in a game, capturing player, hit value,
 /// multiplier, resulting score, timestamp, and whether it was a bust.
 class DartThrow {
+
+  DartThrow({
+    required this.player,
+    required this.value,
+    required this.multiplier,
+    required this.resultingScore,
+    required this.timestamp,
+    this.wasBust = false,
+  });
   /// Name of the player who threw.
   final String player;
 
@@ -18,15 +27,6 @@ class DartThrow {
 
   /// Whether this throw resulted in a bust.
   final bool wasBust;
-
-  DartThrow({
-    required this.player,
-    required this.value,
-    required this.multiplier,
-    required this.resultingScore,
-    required this.timestamp,
-    this.wasBust = false,
-  });
 
   /// Serializes this throw into a JSON-compatible map.
   Map<String, dynamic> toJson() => {
@@ -52,6 +52,33 @@ class DartThrow {
 /// Records the full history of a darts game, including throw list, turn state,
 /// finish information, and persistence metadata.
 class GameHistory {
+
+  GameHistory({
+    required this.id,
+    required this.players,
+    required this.createdAt,
+    required this.modifiedAt,
+    required this.throws,
+    this.winner,
+    this.completedAt,
+    required this.gameMode,
+    this.currentPlayer = 0,
+    this.dartsThrown = 0,
+  });
+
+  /// Creates a [GameHistory] instance from a JSON map.
+  factory GameHistory.fromJson(Map<String, dynamic> j) => GameHistory(
+        id: j['id'],
+        players: List<String>.from(j['players']),
+        createdAt: DateTime.parse(j['createdAt']),
+        modifiedAt: DateTime.parse(j['modifiedAt']),
+        throws: (j['throws'] as List).map((e) => DartThrow.fromJson(e)).toList(),
+        winner: j['winner'],
+        completedAt: j['completedAt'] == null ? null : DateTime.parse(j['completedAt']),
+        gameMode: j['gameMode'],
+        currentPlayer: j['currentPlayer'] ?? 0,
+        dartsThrown: j['dartsThrown'] ?? 0,
+      );
   /// Unique identifier for this game instance.
   final String id;
 
@@ -82,19 +109,6 @@ class GameHistory {
   /// Number of darts thrown by current player this turn.
   int dartsThrown;
 
-  GameHistory({
-    required this.id,
-    required this.players,
-    required this.createdAt,
-    required this.modifiedAt,
-    required this.throws,
-    this.winner,
-    this.completedAt,
-    required this.gameMode,
-    this.currentPlayer = 0,
-    this.dartsThrown = 0,
-  });
-
   /// Converts the game history to a JSON-compatible map for persistence.
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -108,18 +122,4 @@ class GameHistory {
         'currentPlayer': currentPlayer,
         'dartsThrown': dartsThrown,
       };
-
-  /// Creates a [GameHistory] instance from a JSON map.
-  factory GameHistory.fromJson(Map<String, dynamic> j) => GameHistory(
-        id: j['id'],
-        players: List<String>.from(j['players']),
-        createdAt: DateTime.parse(j['createdAt']),
-        modifiedAt: DateTime.parse(j['modifiedAt']),
-        throws: (j['throws'] as List).map((e) => DartThrow.fromJson(e)).toList(),
-        winner: j['winner'],
-        completedAt: j['completedAt'] == null ? null : DateTime.parse(j['completedAt']),
-        gameMode: j['gameMode'],
-        currentPlayer: j['currentPlayer'] ?? 0,
-        dartsThrown: j['dartsThrown'] ?? 0,
-      );
 }

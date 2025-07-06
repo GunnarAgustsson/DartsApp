@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:dars_scoring_app/services/settings_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  bool _isDarkMode;
-  double _textScaleFactor = 1.0;
   
   ThemeProvider({bool initialDarkMode = false}) : _isDarkMode = initialDarkMode;
+  bool _isDarkMode;
+  double _textScaleFactor = 1.0;
   
   bool get isDarkMode => _isDarkMode;
   double get textScaleFactor => _textScaleFactor;

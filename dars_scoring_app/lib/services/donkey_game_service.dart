@@ -11,6 +11,17 @@ import '../services/settings_service.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DonkeyGameController extends ChangeNotifier {
+
+  // Constructor
+  DonkeyGameController({
+    required List<String> players,
+    DonkeyGameHistory? resumeGame,
+    bool randomOrder = false,
+    DonkeyVariant variant = DonkeyVariant.oneDart,
+    bool isTest = false,
+  }) : _isTest = isTest {
+    _initializeGame(players, resumeGame, randomOrder, variant);
+  }
   // Game state
   late DonkeyGameHistory _gameHistory;
   late List<String> _players;
@@ -34,17 +45,6 @@ class DonkeyGameController extends ChangeNotifier {
   Duration _animationDuration = const Duration(milliseconds: 400);
   final bool _isTest;
   bool _isDisposed = false;
-
-  // Constructor
-  DonkeyGameController({
-    required List<String> players,
-    DonkeyGameHistory? resumeGame,
-    bool randomOrder = false,
-    DonkeyVariant variant = DonkeyVariant.oneDart,
-    bool isTest = false,
-  }) : _isTest = isTest {
-    _initializeGame(players, resumeGame, randomOrder, variant);
-  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   /// Getters

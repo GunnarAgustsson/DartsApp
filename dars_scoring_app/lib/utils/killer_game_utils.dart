@@ -32,21 +32,62 @@ class KillerGameUtils {
     final territories = <List<int>>[];
     final usedNumbers = <int>{};
 
-    // First, try to place territories randomly without conflicts
+    // Try multiple times to generate clean territories
+    for (int attempt = 0; attempt < 100; attempt++) {
+      territories.clear();
+      usedNumbers.clear();
+      
+      bool success = true;
+      
+      // Try to place all territories without conflicts
+      for (int i = 0; i < playerCount; i++) {
+        List<int>? territory = _findAvailableTerritory(usedNumbers, random);
+        
+        if (territory != null) {
+          territories.add(territory);
+          usedNumbers.addAll(territory);
+        } else {
+          // Failed to place all territories cleanly, try again
+          success = false;
+          break;
+        }
+      }
+      
+      if (success) {
+        return territories;
+      }
+    }
+    
+    // If we can't generate clean consecutive territories, fall back to mixed approach
+    return _generateMixedTerritories(playerCount, random);
+  }
+
+  /// Fallback method that generates territories with single numbers if needed
+  static List<List<int>> _generateMixedTerritories(int playerCount, math.Random random) {
+    final territories = <List<int>>[];
+    final usedNumbers = <int>{};
+    
     for (int i = 0; i < playerCount; i++) {
+      // Try to get a 3-consecutive territory first
       List<int>? territory = _findAvailableTerritory(usedNumbers, random);
       
       if (territory != null) {
         territories.add(territory);
         usedNumbers.addAll(territory);
       } else {
-        // No clean spot available, use conflict resolution
-        territory = _resolveConflictAndPlace(territories, usedNumbers, random);
-        territories.add(territory);
-        usedNumbers.addAll(territory);
+        // Fall back to single numbers
+        final availableNumbers = dartboardNumbers.where((num) => !usedNumbers.contains(num)).toList();
+        if (availableNumbers.isNotEmpty) {
+          final singleNumber = availableNumbers[random.nextInt(availableNumbers.length)];
+          territories.add([singleNumber]);
+          usedNumbers.add(singleNumber);
+        } else {
+          // This should never happen with proper player limits
+          throw StateError('Unable to assign territory to player ${i + 1}');
+        }
       }
     }
-
+    
     return territories;
   }
 
@@ -69,66 +110,6 @@ class KillerGameUtils {
     // Pick a random available position
     final chosenStartIndex = availableStartPositions[random.nextInt(availableStartPositions.length)];
     return _getConsecutiveNumbers(chosenStartIndex, 3);
-  }
-
-  /// Resolves conflicts by moving existing territories to make space
-  static List<int> _resolveConflictAndPlace(List<List<int>> existingTerritories, Set<int> usedNumbers, math.Random random) {
-    // Find the least crowded area on the dartboard
-    final conflictCounts = <int, int>{};
-    
-    // Count how many territories would conflict with each possible position
-    for (int startIndex = 0; startIndex < dartboardNumbers.length; startIndex++) {
-      final territory = _getConsecutiveNumbers(startIndex, 3);
-      final conflicts = territory.where((num) => usedNumbers.contains(num)).length;
-      conflictCounts[startIndex] = conflicts;
-    }
-    
-    // Find positions with minimum conflicts
-    final minConflicts = conflictCounts.values.reduce(math.min);
-    final bestPositions = conflictCounts.entries
-        .where((entry) => entry.value == minConflicts)
-        .map((entry) => entry.key)
-        .toList();
-    
-    // Pick a random best position
-    final chosenStartIndex = bestPositions[random.nextInt(bestPositions.length)];
-    final newTerritory = _getConsecutiveNumbers(chosenStartIndex, 3);
-    
-    // Now we need to move conflicting territories
-    final conflictingNumbers = newTerritory.where((num) => usedNumbers.contains(num)).toSet();
-    
-    if (conflictingNumbers.isNotEmpty) {
-      // Find which territories need to be moved
-      final territoriesToMove = <int>[];
-      for (int i = 0; i < existingTerritories.length; i++) {
-        if (existingTerritories[i].any((num) => conflictingNumbers.contains(num))) {
-          territoriesToMove.add(i);
-        }
-      }
-      
-      // Remove conflicting territories from used numbers
-      for (final territoryIndex in territoriesToMove) {
-        for (final num in existingTerritories[territoryIndex]) {
-          usedNumbers.remove(num);
-        }
-      }
-      
-      // Relocate conflicting territories
-      for (final territoryIndex in territoriesToMove) {
-        final relocatedTerritory = _findAvailableTerritory(usedNumbers, random);
-        if (relocatedTerritory != null) {
-          existingTerritories[territoryIndex] = relocatedTerritory;
-          usedNumbers.addAll(relocatedTerritory);
-        } else {
-          // If we still can't place it, use a single number fallback
-          final availableSingle = _findAvailableSingleNumber(usedNumbers, random);
-          existingTerritories[territoryIndex] = [availableSingle];
-          usedNumbers.add(availableSingle);
-        }
-      }
-    }
-    
-    return newTerritory;
   }
 
   /// Finds a single available number when no 3-consecutive spots are available
@@ -169,12 +150,12 @@ class KillerGameUtils {
     
     // Handle bull
     if (cleanInput == 'BULL' || cleanInput == '50') {
-      return DartHit(number: 50, multiplier: 1, isBull: true);
+      return const DartHit(number: 50, multiplier: 1, isBull: true);
     }
     
     // Handle outer bull
     if (cleanInput == '25') {
-      return DartHit(number: 25, multiplier: 1, isBull: false);
+      return const DartHit(number: 25, multiplier: 1, isBull: false);
     }
     
     // Handle multipliers
@@ -235,6 +216,12 @@ class KillerGameUtils {
 
 /// Represents a single dart hit
 class DartHit {
+
+  const DartHit({
+    required this.number,
+    required this.multiplier,
+    required this.isBull,
+  });
   /// The number hit on the dartboard (1-20, 25, or 50)
   final int number;
   
@@ -243,12 +230,6 @@ class DartHit {
   
   /// Whether this is a bull hit (25 or 50)
   final bool isBull;
-
-  const DartHit({
-    required this.number,
-    required this.multiplier,
-    required this.isBull,
-  });
 
   /// The total score for this hit
   int get score => number * multiplier;

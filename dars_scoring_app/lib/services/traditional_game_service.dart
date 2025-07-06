@@ -13,7 +13,49 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION: TraditionalGameController
 // Encapsulates all scoring rules, state management, and history persistence.
-class TraditionalGameController extends ChangeNotifier {
+class TraditionalGameController extends ChangeNotifier {  /// Constructor: initializes state, resumes history if provided.
+  TraditionalGameController({
+    required this.startingScore,
+    required this.players,
+    GameHistory? resumeGame,
+    CheckoutRule? checkoutRule,
+    this.randomOrder = false,
+  })  : currentGame = resumeGame ?? 
+            GameHistory(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              players: players,
+              createdAt: DateTime.now(),
+              modifiedAt: DateTime.now(),
+              throws: [],
+              completedAt: null,
+              gameMode: startingScore,
+            ),
+        checkoutRule = checkoutRule ?? CheckoutRule.doubleOut {
+    // Initialize scores list
+    scores = List<int>.filled(players.length, startingScore);
+
+    // If resuming, load prior throws & scores
+    if (resumeGame != null) _loadFromHistory(resumeGame);
+
+    // Load user-preferred finish rule only if not explicitly provided
+    if (checkoutRule == null) {
+      _initCheckoutRule();
+    }
+    
+    // Load animation speed settings
+    _loadAnimationSpeed();
+
+    // Configure audio player - only if not in test environment
+    if (!_isTestEnvironment()) {
+      try {
+        _audio = AudioPlayer();
+        _audio?.setReleaseMode(ReleaseMode.stop);
+      } catch (e) {
+        // Ignore audio errors in test environment
+        debugPrint('Audio initialization skipped: $e');
+      }
+    }
+  }
   // Default animation durations - will be replaced by user settings
   Duration _bustDisplayDuration = const Duration(seconds: 2);
   Duration _turnChangeDuration = const Duration(seconds: 2);
@@ -130,48 +172,6 @@ class TraditionalGameController extends ChangeNotifier {
     // Calculate average per 3 darts
     if (validDartsCount == 0) return 0.0;
     return (totalScoreFromThrows / validDartsCount) * 3;
-  }  /// Constructor: initializes state, resumes history if provided.
-  TraditionalGameController({
-    required this.startingScore,
-    required this.players,
-    GameHistory? resumeGame,
-    CheckoutRule? checkoutRule,
-    this.randomOrder = false,
-  })  : currentGame = resumeGame ?? 
-            GameHistory(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              players: players,
-              createdAt: DateTime.now(),
-              modifiedAt: DateTime.now(),
-              throws: [],
-              completedAt: null,
-              gameMode: startingScore,
-            ),
-        checkoutRule = checkoutRule ?? CheckoutRule.doubleOut {
-    // Initialize scores list
-    scores = List<int>.filled(players.length, startingScore);
-
-    // If resuming, load prior throws & scores
-    if (resumeGame != null) _loadFromHistory(resumeGame);
-
-    // Load user-preferred finish rule only if not explicitly provided
-    if (checkoutRule == null) {
-      _initCheckoutRule();
-    }
-    
-    // Load animation speed settings
-    _loadAnimationSpeed();
-
-    // Configure audio player - only if not in test environment
-    if (!_isTestEnvironment()) {
-      try {
-        _audio = AudioPlayer();
-        _audio?.setReleaseMode(ReleaseMode.stop);
-      } catch (e) {
-        // Ignore audio errors in test environment
-        debugPrint('Audio initialization skipped: $e');
-      }
-    }
   }
 
   /// Load animation speed from settings

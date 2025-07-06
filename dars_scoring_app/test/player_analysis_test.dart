@@ -595,7 +595,7 @@ Future<Map<String, dynamic>> _calculatePlayerStats(String playerName, SharedPref
     }
   });
   
-  String favoriteRoute = "";
+  String favoriteRoute = '';
   int maxCount = 0;
   checkoutRoutes.forEach((route, count) {
     if (count > maxCount) {

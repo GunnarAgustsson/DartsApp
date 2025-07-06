@@ -9,7 +9,42 @@ import '../models/cricket_game.dart';
 import '../models/app_enums.dart';
 import 'settings_service.dart';
 
-class CricketGameController extends ChangeNotifier {
+class CricketGameController extends ChangeNotifier {  /// Constructor
+  CricketGameController({
+    required this.players,
+    required this.variant,
+    CricketGameHistory? resumeGame,
+    this.randomOrder = false,
+  }) : currentGame = resumeGame ?? 
+            CricketGameHistory(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              players: players,
+              createdAt: DateTime.now(),
+              modifiedAt: DateTime.now(),
+              throws: [],
+              completedAt: null,
+              currentPlayer: 0,
+              dartsThrown: 0,
+            ) {
+      // If resuming, load prior state
+    if (resumeGame != null) {
+      _loadFromHistory(resumeGame);
+    }
+    
+    // Load animation speed setting
+    _loadAnimationSpeed();
+    
+    // Configure audio player - only if not in test environment
+    if (!_isTestEnvironment()) {
+      try {
+        _audio = AudioPlayer();
+        _audio?.setReleaseMode(ReleaseMode.stop);
+      } catch (e) {
+        // Ignore audio errors in test environment
+        debugPrint('Audio initialization skipped: $e');
+      }
+    }
+  }
   // Constants for timing
   static const Duration _turnChangeDuration = Duration(seconds: 2);
   static const Duration _saveDebounceDuration = Duration(milliseconds: 500);
@@ -105,41 +140,6 @@ class CricketGameController extends ChangeNotifier {
     _debouncedSave();
     
     notifyListeners();
-  }  /// Constructor
-  CricketGameController({
-    required this.players,
-    required this.variant,
-    CricketGameHistory? resumeGame,
-    this.randomOrder = false,
-  }) : currentGame = resumeGame ?? 
-            CricketGameHistory(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              players: players,
-              createdAt: DateTime.now(),
-              modifiedAt: DateTime.now(),
-              throws: [],
-              completedAt: null,
-              currentPlayer: 0,
-              dartsThrown: 0,
-            ) {
-      // If resuming, load prior state
-    if (resumeGame != null) {
-      _loadFromHistory(resumeGame);
-    }
-    
-    // Load animation speed setting
-    _loadAnimationSpeed();
-    
-    // Configure audio player - only if not in test environment
-    if (!_isTestEnvironment()) {
-      try {
-        _audio = AudioPlayer();
-        _audio?.setReleaseMode(ReleaseMode.stop);
-      } catch (e) {
-        // Ignore audio errors in test environment
-        debugPrint('Audio initialization skipped: $e');
-      }
-    }
   }
 
   /// Load from history to restore state

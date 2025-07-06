@@ -3,13 +3,6 @@ import 'dart:math' as math;
 import 'package:dars_scoring_app/theme/app_colors.dart';
 
 class SpiderWebPainter extends CustomPainter {
-  final Map<int, int> originalHitMap; // To store the original hitMap for comparison
-  final Map<int, int> _processedHitMap; // Internal map with all numbers initialized
-  final int maxHits;
-  final Brightness brightness;
-  
-  // Standard dartboard arrangement (clockwise from top)
-  final List<int> dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
   
   SpiderWebPainter(Map<int, int> hitMap, this.maxHits, this.brightness) : 
     originalHitMap = Map.from(hitMap), // Store a copy of the original map
@@ -21,6 +14,13 @@ class SpiderWebPainter extends CustomPainter {
       ])
         number: hitMap[number] ?? 0, // If number not in hitMap, default to 0
     };
+  final Map<int, int> originalHitMap; // To store the original hitMap for comparison
+  final Map<int, int> _processedHitMap; // Internal map with all numbers initialized
+  final int maxHits;
+  final Brightness brightness;
+  
+  // Standard dartboard arrangement (clockwise from top)
+  final List<int> dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
   @override
   void paint(Canvas canvas, Size size) {

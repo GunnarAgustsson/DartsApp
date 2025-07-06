@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:async';
 import '../models/killer_player.dart';
 
 class InteractiveDartboard extends StatefulWidget {
-  final double size;
-  final Set<String> highlightedAreas;
-  final List<KillerPlayerTerritory> killerTerritories;
-  final Function(String)? onAreaTapped;
-  final Color? highlightColor;
-  final bool interactive;
 
   const InteractiveDartboard({
     super.key,
@@ -19,6 +14,12 @@ class InteractiveDartboard extends StatefulWidget {
     this.highlightColor,
     this.interactive = true,
   });
+  final double size;
+  final Set<String> highlightedAreas;
+  final List<KillerPlayerTerritory> killerTerritories;
+  final Function(String)? onAreaTapped;
+  final Color? highlightColor;
+  final bool interactive;
 
   @override
   State<InteractiveDartboard> createState() => _InteractiveDartboardState();
@@ -26,6 +27,45 @@ class InteractiveDartboard extends StatefulWidget {
 
 class _InteractiveDartboardState extends State<InteractiveDartboard> {
   String? hoveredArea;
+  Timer? _animationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAnimationTimer();
+  }
+
+  @override
+  void dispose() {
+    _animationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAnimationTimer() {
+    // Only start timer if there are killers to animate
+    final hasKillers = widget.killerTerritories.any((t) => t.isKiller && t.pulseIntensity > 0);
+    if (hasKillers) {
+      _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+        if (mounted) {
+          setState(() {}); // Trigger repaint for pulsing effect
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(InteractiveDartboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Restart timer if killer status changed
+    final oldHasKillers = oldWidget.killerTerritories.any((t) => t.isKiller && t.pulseIntensity > 0);
+    final newHasKillers = widget.killerTerritories.any((t) => t.isKiller && t.pulseIntensity > 0);
+    
+    if (oldHasKillers != newHasKillers) {
+      _animationTimer?.cancel();
+      _startAnimationTimer();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,12 +162,6 @@ class _InteractiveDartboardState extends State<InteractiveDartboard> {
 }
 
 class DartboardPainter extends CustomPainter {
-  final Set<String> highlightedAreas;
-  final List<KillerPlayerTerritory> killerTerritories;
-  final String? hoveredArea;
-  final Color highlightColor;
-  final bool isDarkMode;
-  final double dartboardSize;
 
   DartboardPainter({
     required this.highlightedAreas,
@@ -137,6 +171,12 @@ class DartboardPainter extends CustomPainter {
     required this.isDarkMode,
     required this.dartboardSize,
   });
+  final Set<String> highlightedAreas;
+  final List<KillerPlayerTerritory> killerTerritories;
+  final String? hoveredArea;
+  final Color highlightColor;
+  final bool isDarkMode;
+  final double dartboardSize;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -313,22 +353,22 @@ class DartboardPainter extends CustomPainter {
           shadows: [
             // Add contrasting shadow for better visibility
             Shadow(
-              offset: Offset(1.0, 1.0),
+              offset: const Offset(1.0, 1.0),
               blurRadius: 2.0,
               color: isDarkMode ? Colors.black : Colors.white,
             ),
             Shadow(
-              offset: Offset(-1.0, -1.0),
+              offset: const Offset(-1.0, -1.0),
               blurRadius: 2.0,
               color: isDarkMode ? Colors.black : Colors.white,
             ),
             Shadow(
-              offset: Offset(1.0, -1.0),
+              offset: const Offset(1.0, -1.0),
               blurRadius: 2.0,
               color: isDarkMode ? Colors.black : Colors.white,
             ),
             Shadow(
-              offset: Offset(-1.0, 1.0),
+              offset: const Offset(-1.0, 1.0),
               blurRadius: 2.0,
               color: isDarkMode ? Colors.black : Colors.white,
             ),
@@ -359,105 +399,125 @@ class DartboardPainter extends CustomPainter {
 
   /// Draws highlight for a single territory area with health-based effects
   void _drawKillerHighlight(Canvas canvas, Offset center, double radius, String area, KillerPlayerTerritory territory) {
-    // Calculate enhanced opacity with pulse effect for current player
-    final baseOpacity = territory.highlightOpacity;
-    final pulseBoost = territory.isCurrentPlayer ? (territory.pulseIntensity * 0.3) : 0.0;
-    final finalOpacity = (baseOpacity + pulseBoost).clamp(0.0, 1.0);
+    // Base background color with health-based fill percentage
+    final baseOpacity = territory.highlightOpacity * territory.fillPercentage;
+    final backgroundPaint = Paint()
+      ..color = territory.playerColor.withOpacity(baseOpacity)
+      ..style = PaintingStyle.fill;
+    _drawAreaHighlight(canvas, center, radius, area, backgroundPaint);
 
     // Special effects for different player states
     if (territory.isEliminated) {
-      // Faded gray effect for eliminated players
+      // Faded gray overlay for eliminated players
       final eliminatedPaint = Paint()
-        ..color = Colors.grey.withOpacity(0.3)
+        ..color = Colors.grey.withOpacity(0.6)
         ..style = PaintingStyle.fill;
       _drawAreaHighlight(canvas, center, radius, area, eliminatedPaint);
-      return;
     }
 
-    // Enhanced glow effect for killers
-    if (territory.isKiller) {
-      final glowIntensity = territory.isCurrentPlayer ? (0.5 + territory.pulseIntensity * 0.3) : 0.4;
-      final glowPaint = Paint()
-        ..color = territory.playerColor.withOpacity(glowIntensity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 4.0);
+    // Enhanced glow effect for killers with pulsing
+    if (territory.isKiller && territory.pulseIntensity > 0) {
+      // Create pulsing effect using a time-based calculation
+      final time = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      final pulseValue = (math.sin(time * 2.0) + 1.0) / 2.0; // 0.0 to 1.0
+      final pulseOpacity = territory.highlightOpacity + (territory.pulseIntensity * pulseValue * 0.3);
       
-      // Draw killer glow effect
-      _drawAreaHighlight(canvas, center, radius, area, glowPaint);
-    }
-
-    // Draw health-based fill
-    if (territory.borderOnly) {
-      // Only border for 0 health players - thick and visible
-      final borderPaint = Paint()
-        ..color = territory.playerColor
-        ..strokeWidth = 5.0
-        ..style = PaintingStyle.stroke;
-      _drawAreaHighlight(canvas, center, radius, area, borderPaint);
-    } else {
-      // Partial fill based on health percentage
-      final fillPaint = Paint()
-        ..color = territory.playerColor.withOpacity(finalOpacity * territory.fillPercentage)
+      final pulsePaint = Paint()
+        ..color = territory.playerColor.withOpacity(pulseOpacity.clamp(0.0, 1.0))
         ..style = PaintingStyle.fill;
-      _drawAreaHighlight(canvas, center, radius, area, fillPaint);
+      
+      _drawAreaHighlight(canvas, center, radius, area, pulsePaint);
+      
+      // Add outer glow for killers
+      final glowPaint = Paint()
+        ..color = territory.playerColor.withOpacity(0.4 + (pulseValue * 0.2))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 8.0);
+      
+      _drawAreaHighlight(canvas, center, radius, area, glowPaint);
     }
   }
 
-  /// Draws clean borders around territory areas
+  /// Draws a single border around contiguous territory segments for each player
   void _drawTerritoryBorders(Canvas canvas, Offset center, double radius) {
+    const dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+    final totalSegments = dartboardNumbers.length;
     for (final territory in killerTerritories) {
       if (territory.areas.isEmpty) continue;
-      
       // Parse all numbers in this territory
       List<int> numbers = territory.areas
           .map((area) => int.tryParse(area))
           .where((num) => num != null && num >= 1 && num <= 20)
           .cast<int>()
           .toList();
-      
       if (numbers.isEmpty) continue;
-      
-      const dartboardNumbers = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-      
-      final borderPaint = Paint()
-        ..color = territory.playerColor
-        ..strokeWidth = territory.isKiller ? 5.0 : 3.0
-        ..style = PaintingStyle.stroke;
-        
-      // Draw border around each number segment that belongs to this territory
-      for (final number in numbers) {
-        final segmentIndex = dartboardNumbers.indexOf(number);
-        if (segmentIndex == -1) continue;
-        
-        final startAngle = (segmentIndex * 18 - 9 - 180) * math.pi / 180;
-        final endAngle = (segmentIndex * 18 + 9 - 180) * math.pi / 180;
-        
-        // Draw complete border around the number area
-        _drawAreaBorder(canvas, center, radius, startAngle, endAngle, borderPaint);
+      // Convert to segment indices
+      final indices = numbers.map((n) => dartboardNumbers.indexOf(n)).where((i) => i != -1).toList()..sort();
+      if (indices.isEmpty) continue;
+      // Group adjacent indices (wraps around)
+      final groups = _groupAdjacentIndices(indices, totalSegments);
+      for (final group in groups) {
+        _drawContiguousTerritoryBorder(canvas, center, radius, group, territory.playerColor);
       }
     }
   }
 
-  /// Draws a border around a complete dartboard area (number segment)
-  void _drawAreaBorder(Canvas canvas, Offset center, double radius, double startAngle, double endAngle, Paint paint) {
-    final path = Path();
+  /// Groups adjacent indices, wrapping around the dartboard
+  List<List<int>> _groupAdjacentIndices(List<int> indices, int total) {
+    if (indices.isEmpty) return [];
+    List<List<int>> groups = [];
+    List<int> current = [indices.first];
+    for (int i = 1; i < indices.length; i++) {
+      if ((indices[i] == (indices[i - 1] + 1) % total)) {
+        current.add(indices[i]);
+      } else {
+        groups.add(List.from(current));
+        current = [indices[i]];
+      }
+    }
+    // Check wrap-around adjacency
+    if (groups.isNotEmpty && (indices.first == (indices.last + 1) % total)) {
+      groups.first.insertAll(0, current);
+    } else {
+      groups.add(current);
+    }
+    return groups;
+  }
+
+  /// Draws a single border around a contiguous group of segments
+  void _drawContiguousTerritoryBorder(Canvas canvas, Offset center, double radius, List<int> group, Color playerColor) {
+    if (group.isEmpty) return;
     
-    // Start from inner edge
     final innerRadius = radius * 0.08;
     final outerRadius = radius * 0.95;
     
-    // Move to start of inner arc
+    final borderPaint = Paint()
+      ..color = playerColor
+      ..strokeWidth = 6.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    
+    // Build path around the group
+    final path = Path();
+    
+    // Start at left edge of first segment, inner radius
+    final firstIdx = group.first;
+    final lastIdx = group.last;
+    final startAngle = (firstIdx * 18 - 9 - 180) * math.pi / 180;
+    final endAngle = ((lastIdx) * 18 + 9 - 180) * math.pi / 180;
+    
+    // Move to start of first segment, inner radius
     path.moveTo(
       center.dx + math.cos(startAngle + math.pi / 2) * innerRadius,
       center.dy + math.sin(startAngle + math.pi / 2) * innerRadius,
     );
     
-    // Line to outer edge
+    // Draw left side up to outer radius
     path.lineTo(
       center.dx + math.cos(startAngle + math.pi / 2) * outerRadius,
       center.dy + math.sin(startAngle + math.pi / 2) * outerRadius,
     );
     
-    // Arc along outer edge
+    // Arc along outer edge from start to end
     path.arcTo(
       Rect.fromCircle(center: center, radius: outerRadius),
       startAngle + math.pi / 2,
@@ -465,13 +525,13 @@ class DartboardPainter extends CustomPainter {
       false,
     );
     
-    // Line back to inner edge
+    // Down right side to inner radius
     path.lineTo(
       center.dx + math.cos(endAngle + math.pi / 2) * innerRadius,
       center.dy + math.sin(endAngle + math.pi / 2) * innerRadius,
     );
     
-    // Arc along inner edge (reverse direction)
+    // Arc along inner edge back to start
     path.arcTo(
       Rect.fromCircle(center: center, radius: innerRadius),
       endAngle + math.pi / 2,
@@ -480,13 +540,6 @@ class DartboardPainter extends CustomPainter {
     );
     
     path.close();
-    
-    // Draw the border only
-    final borderPaint = Paint()
-      ..color = paint.color
-      ..strokeWidth = paint.strokeWidth
-      ..style = PaintingStyle.stroke;
-    
     canvas.drawPath(path, borderPaint);
   }
 
@@ -522,9 +575,13 @@ class DartboardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DartboardPainter oldDelegate) {
+    // Always repaint to enable pulsing animations for killers
+    final hasKillers = killerTerritories.any((t) => t.isKiller && t.pulseIntensity > 0);
+    
     return oldDelegate.highlightedAreas != highlightedAreas ||
            oldDelegate.killerTerritories != killerTerritories ||
            oldDelegate.hoveredArea != hoveredArea ||
-           oldDelegate.highlightColor != highlightColor;
+           oldDelegate.highlightColor != highlightColor ||
+           hasKillers; // Repaint when there are killers to show pulsing
   }
 }

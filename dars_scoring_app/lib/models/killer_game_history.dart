@@ -2,32 +2,6 @@ import 'package:dars_scoring_app/models/killer_player.dart';
 
 /// Represents a completed Killer game for history tracking
 class KillerGameHistory {
-  /// Unique identifier for this game instance
-  final String id;
-  
-  /// When the game was started
-  final DateTime gameStartTime;
-  
-  /// When the game was completed
-  final DateTime gameEndTime;
-  
-  /// List of all players who participated
-  final List<String> playerNames;
-  
-  /// The winner of the game
-  final String winner;
-  
-  /// Total number of darts thrown in the game
-  final int totalDartsThrown;
-  
-  /// Duration of the game
-  Duration get gameDuration => gameEndTime.difference(gameStartTime);
-  
-  /// Map of player names to their final territories
-  final Map<String, List<int>> playerTerritories;
-  
-  /// Map of player names to their final health values
-  final Map<String, int> finalPlayerHealth;
 
   const KillerGameHistory({
     required this.id,
@@ -69,21 +43,6 @@ class KillerGameHistory {
     );
   }
 
-  /// Converts this history entry to a JSON map for storage
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'gameMode': 'Killer', // For unified game history compatibility
-      'gameStartTime': gameStartTime.toIso8601String(),
-      'gameEndTime': gameEndTime.toIso8601String(),
-      'playerNames': playerNames,
-      'winner': winner,
-      'totalDartsThrown': totalDartsThrown,
-      'playerTerritories': playerTerritories,
-      'finalPlayerHealth': finalPlayerHealth,
-    };
-  }
-
   /// Creates a KillerGameHistory from a JSON map
   factory KillerGameHistory.fromJson(Map<String, dynamic> json) {
     return KillerGameHistory(
@@ -102,6 +61,47 @@ class KillerGameHistory {
         json['finalPlayerHealth'] as Map<String, dynamic>
       ),
     );
+  }
+  /// Unique identifier for this game instance
+  final String id;
+  
+  /// When the game was started
+  final DateTime gameStartTime;
+  
+  /// When the game was completed
+  final DateTime gameEndTime;
+  
+  /// List of all players who participated
+  final List<String> playerNames;
+  
+  /// The winner of the game
+  final String winner;
+  
+  /// Total number of darts thrown in the game
+  final int totalDartsThrown;
+  
+  /// Duration of the game
+  Duration get gameDuration => gameEndTime.difference(gameStartTime);
+  
+  /// Map of player names to their final territories
+  final Map<String, List<int>> playerTerritories;
+  
+  /// Map of player names to their final health values
+  final Map<String, int> finalPlayerHealth;
+
+  /// Converts this history entry to a JSON map for storage
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'gameMode': 'Killer', // For unified game history compatibility
+      'gameStartTime': gameStartTime.toIso8601String(),
+      'gameEndTime': gameEndTime.toIso8601String(),
+      'playerNames': playerNames,
+      'winner': winner,
+      'totalDartsThrown': totalDartsThrown,
+      'playerTerritories': playerTerritories,
+      'finalPlayerHealth': finalPlayerHealth,
+    };
   }
 
   @override

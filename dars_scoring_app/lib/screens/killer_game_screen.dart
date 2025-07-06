@@ -7,17 +7,18 @@ import '../services/killer_game_state_service.dart';
 import '../services/killer_game_history_service.dart';
 import '../widgets/interactive_dartboard.dart';
 import '../widgets/dart_icon.dart';
+import '../widgets/killer_overlay_animation.dart';
 
 /// Main screen for playing Killer darts game
 class KillerGameScreen extends StatefulWidget {
-  final List<String> playerNames;
-  final bool randomOrder;
 
   const KillerGameScreen({
     super.key,
     required this.playerNames,
     required this.randomOrder,
   });
+  final List<String> playerNames;
+  final bool randomOrder;
 
   @override
   State<KillerGameScreen> createState() => _KillerGameScreenState();
@@ -41,8 +42,13 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   int _selectedMultiplier = 1;
   
   // Dart tracking state
-  List<DartResult> _currentTurnDarts = [];
+  final List<DartResult> _currentTurnDarts = [];
   final int _maxDartsPerTurn = 3;
+
+  // Overlay animation state
+  bool _showOverlay = false;
+  KillerOverlayType? _overlayType;
+  String _overlayPlayerName = '';
 
   @override
   void initState() {
@@ -114,8 +120,8 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       if (KillerGameUtils.hitAffectsTerritory(hit, currentPlayer.territory)) {
         final hitCount = currentPlayer.hitCount + KillerGameUtils.calculateHitCount(hit);
         
-        // FIXED: Players gain health when hitting their own territory
-        // Need 3+ health to become a killer
+        // Players gain health when hitting their own territory
+        // Must have exactly 3 health to become a killer
         final newHealth = currentPlayer.health + KillerGameUtils.calculateHitCount(hit);
         final isKiller = newHealth >= 3;
         
@@ -126,7 +132,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
         );
         
         if (isKiller && !currentPlayer.isKiller) {
-          _showKillerNotification(currentPlayer.name);
+          _showOverlayAnimation(KillerOverlayType.playerBecomesKiller, currentPlayer.name);
         }
       }
       
@@ -140,13 +146,25 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
           
           if (KillerGameUtils.hitAffectsTerritory(hit, targetPlayer.territory)) {
             final damageDealt = KillerGameUtils.calculateHitCount(hit);
-            // FIXED: Health can go negative, eliminated when health < 0
+            // Health can go negative, eliminated when health < 0
             final newHealth = targetPlayer.health - damageDealt;
             
-            players[i] = targetPlayer.copyWith(health: newHealth);
+            // If player loses health and was a killer, they lose killer status
+            final wasKiller = targetPlayer.isKiller;
+            final isStillKiller = newHealth >= 3;
             
-            // Show damage feedback
-            _showDamageNotification(targetPlayer.name, damageDealt, newHealth);
+            players[i] = targetPlayer.copyWith(
+              health: newHealth,
+              isKiller: isStillKiller,
+            );
+            
+            // Show feedback for killer status loss or elimination
+            if (newHealth < 0) {
+              _showOverlayAnimation(KillerOverlayType.playerEliminated, targetPlayer.name);
+            } else if (wasKiller && !isStillKiller) {
+              // Player lost killer status but isn't eliminated
+              _showOverlayAnimation(KillerOverlayType.turnChange, '${targetPlayer.name} lost killer status!');
+            }
             break; // Only one player can be hit per dart
           }
         }
@@ -304,25 +322,27 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       final player = entry.value;
       final color = KillerGameUtils.getPlayerColor(index);
       
-      // Enhanced visual feedback for health progression
+      // Health-based visual feedback
+      double highlightOpacity = 0.3; // Base opacity
       double fillPercentage = 0.0;
-      double highlightOpacity = 0.4;
       double pulseIntensity = 0.0;
+      bool borderOnly = false;
       
       if (player.isEliminated) {
-        // Eliminated players: no fill, just dark border
-        fillPercentage = 0.0;
+        // Eliminated players: very dark
         highlightOpacity = 0.2;
-      } else if (player.isKiller) {
-        // Killers: full bright glow
-        fillPercentage = 1.0;
-        highlightOpacity = 0.8;
-        pulseIntensity = index == currentPlayerIndex ? 0.3 : 0.1;
+        fillPercentage = 0.0;
+        borderOnly = true;
       } else {
-        // Building health: gradual fill from 0 to 3
+        // Health progression: 1HP = 33%, 2HP = 66%, 3HP = 100%
         fillPercentage = (player.health / 3.0).clamp(0.0, 1.0);
-        highlightOpacity = 0.3 + (fillPercentage * 0.3); // More visible as health increases
-        pulseIntensity = index == currentPlayerIndex ? 0.2 : 0.0;
+        highlightOpacity = 0.3 + (fillPercentage * 0.4); // Gradually brighten
+        
+        if (player.isKiller) {
+          // Killers: full brightness with pulse
+          highlightOpacity = 0.8;
+          pulseIntensity = index == currentPlayerIndex ? 0.4 : 0.2; // Current killer pulses more
+        }
       }
       
       return KillerPlayerTerritory(
@@ -333,39 +353,21 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
         isEliminated: player.isEliminated,
         isKiller: player.isKiller,
         isCurrentPlayer: index == currentPlayerIndex,
-        borderOnly: player.isEliminated,
+        borderOnly: borderOnly,
         fillPercentage: fillPercentage,
         pulseIntensity: pulseIntensity,
-        showPlayerName: true, // Show player names on territories
+        showPlayerName: true,
       );
     }).toList();
   }
 
-  /// Show killer achievement notification
-  void _showKillerNotification(String playerName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🎯 $playerName becomes a KILLER!'),
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.amber,
-      ),
-    );
-  }
-
-  /// Show damage notification
-  void _showDamageNotification(String playerName, int damage, int newHealth) {
-    final isEliminated = newHealth < 0;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isEliminated 
-              ? '💀 $playerName is ELIMINATED! (Health: $newHealth)'
-              : '$playerName takes $damage damage! Health: $newHealth'
-        ),
-        duration: const Duration(seconds: 2),
-        backgroundColor: isEliminated ? Colors.red : Colors.orange,
-      ),
-    );
+  /// Show overlay animation for game events
+  void _showOverlayAnimation(KillerOverlayType type, String playerName) {
+    setState(() {
+      _overlayType = type;
+      _overlayPlayerName = playerName;
+      _showOverlay = true;
+    });
   }
 
   /// Show error dialog
@@ -406,24 +408,37 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Return to game modes
+              
+              // Start a new game with same players
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => KillerGameScreen(
+                    playerNames: widget.playerNames,
+                    randomOrder: widget.randomOrder,
+                  ),
+                ),
+              );
             },
-            child: const Text('New Game'),
+            child: const Text('Play Again'),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
+              Navigator.of(context).popUntil((r) => r.isFirst); // Return to home screen
             },
-            child: const Text('View Results'),
+            child: const Text('Back to Menu'),
           ),
         ],
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -440,255 +455,285 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
         title: const Text('Killer'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        elevation: 0,
       ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Dartboard section - takes up top portion
-            Expanded(
-              flex: 6,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                ),
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 1.0,
-                    child: InteractiveDartboard(
-                      size: 300,
-                      killerTerritories: _getKillerTerritories(),
-                      interactive: false, // Pure visual now
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Main game content
+            _buildGameContent(context, currentPlayer),
             
-            // Combined current player and dart tracking section
-            if (currentPlayer != null && !isGameCompleted)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    // Current player name
-                    Text(
-                      '${currentPlayer.name}\'s Turn',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Dart tracking display with dart icons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Darts: ',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ...List.generate(_maxDartsPerTurn, (index) {
-                          if (index < _currentTurnDarts.length) {
-                            // Show result of thrown dart
-                            final dart = _currentTurnDarts[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 3),
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: dart.isMiss 
-                                      ? Theme.of(context).colorScheme.errorContainer
-                                      : dart.playerColor?.withOpacity(0.8),
-                                  border: Border.all(
-                                    color: dart.isMiss 
-                                        ? Theme.of(context).colorScheme.error
-                                        : dart.playerColor!,
-                                    width: 2,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    dart.isMiss 
-                                        ? 'M' 
-                                        : dart.playerTarget.substring(0, 1).toUpperCase(),
-                                    style: TextStyle(
-                                      color: dart.isMiss 
-                                          ? Theme.of(context).colorScheme.onErrorContainer
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          } else {
-                            // Show remaining dart icon using SVG
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 3),
-                              child: DartIcon(
-                                size: 36,
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
-                              ),
-                            );
-                          }
-                        }),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            
-            // Control buttons section - takes up bottom portion
-            Expanded(
-              flex: 4,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Multiplier buttons row with strong theme colors
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _selectedMultiplier == 2 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.primaryContainer,
-                                foregroundColor: _selectedMultiplier == 2
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onPrimaryContainer,
-                                elevation: _selectedMultiplier == 2 ? 8 : 2,
-                                shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              onPressed: isGameCompleted ? null : () => _handleMultiplierTap(2),
-                              child: Text(
-                                'x2',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _selectedMultiplier == 3 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.primaryContainer,
-                                foregroundColor: _selectedMultiplier == 3
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onPrimaryContainer,
-                                elevation: _selectedMultiplier == 3 ? 8 : 2,
-                                shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              onPressed: isGameCompleted ? null : () => _handleMultiplierTap(3),
-                              child: Text(
-                                'x3',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Player/Target buttons - only show enabled ones
-                    Expanded(
-                      child: _buildPlayerButtons(),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Action buttons row with strong theme colors
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.error,
-                              foregroundColor: Theme.of(context).colorScheme.onError,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 4,
-                            ),
-                            onPressed: isGameCompleted ? null : () => _handleMissTap(),
-                            icon: const Icon(Icons.close, size: 20),
-                            label: Text(
-                              'Miss',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.secondary,
-                              foregroundColor: Theme.of(context).colorScheme.onSecondary,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 4,
-                            ),
-                            onPressed: (isGameCompleted || _currentTurnDarts.isEmpty) ? null : () => _handleUndoTap(),
-                            icon: const Icon(Icons.undo, size: 20),
-                            label: Text(
-                              'Undo',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            // Overlay animation
+            KillerOverlayAnimation(
+              overlayType: _overlayType ?? KillerOverlayType.turnChange,
+              playerName: _overlayPlayerName,
+              isVisible: _showOverlay,
+              onAnimationComplete: () {
+                setState(() {
+                  _showOverlay = false;
+                });
+              },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameContent(BuildContext context, KillerPlayer? currentPlayer) {
+    final screenSize = MediaQuery.of(context).size;
+    final isTablet = screenSize.shortestSide >= 600;
+    final dartboardSize = isTablet ? 350.0 : 280.0;
+
+    return Column(
+      children: [
+        // Dartboard section - responsive sizing
+        Expanded(
+          flex: isTablet ? 5 : 6,
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(isTablet ? 24 : 16),
+            child: Center(
+              child: SizedBox(
+                width: dartboardSize,
+                height: dartboardSize,
+                child: InteractiveDartboard(
+                  size: dartboardSize,
+                  killerTerritories: _getKillerTerritories(),
+                  interactive: false, // Pure visual now
+                ),
+              ),
+            ),
+          ),
+        ),
+        
+        // Combined current player and dart tracking section
+        if (currentPlayer != null && !isGameCompleted)
+          Container(
+            width: double.infinity,
+            margin: EdgeInsets.symmetric(
+              horizontal: isTablet ? 24 : 16,
+              vertical: isTablet ? 12 : 8,
+            ),
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Current player name
+                Text(
+                  '${currentPlayer.name}\'s Turn',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontSize: isTablet ? 26 : 22,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                SizedBox(height: isTablet ? 16 : 12),
+                
+                // Dart tracking display with dart icons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Darts: ',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontSize: isTablet ? 18 : 16,
+                      ),
+                    ),
+                    SizedBox(width: isTablet ? 16 : 12),
+                    ...List.generate(_maxDartsPerTurn, (index) {
+                      if (index < _currentTurnDarts.length) {
+                        // Show result of thrown dart
+                        final dart = _currentTurnDarts[index];
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isTablet ? 4 : 3),
+                          child: Container(
+                            width: isTablet ? 44 : 36,
+                            height: isTablet ? 44 : 36,
+                            decoration: BoxDecoration(
+                              color: dart.isMiss 
+                                  ? Theme.of(context).colorScheme.errorContainer
+                                  : dart.playerColor?.withOpacity(0.8),
+                              border: Border.all(
+                                color: dart.isMiss 
+                                    ? Theme.of(context).colorScheme.error
+                                    : dart.playerColor!,
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                dart.isMiss 
+                                    ? 'M' 
+                                    : dart.playerTarget.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  color: dart.isMiss 
+                                      ? Theme.of(context).colorScheme.onErrorContainer
+                                      : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isTablet ? 16 : 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        // Show remaining dart icon using SVG
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isTablet ? 4 : 3),
+                          child: DartIcon(
+                            size: isTablet ? 44 : 36,
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                          ),
+                        );
+                      }
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        // Control buttons section - responsive sizing
+        Expanded(
+          flex: isTablet ? 4 : 4,
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(isTablet ? 24 : 16),
+            child: Column(
+              children: [
+                // Multiplier buttons row with strong theme colors
+                SizedBox(
+                  height: isTablet ? 60 : 50,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildMultiplierButton(2, isTablet),
+                      ),
+                      SizedBox(width: isTablet ? 16 : 12),
+                      Expanded(
+                        child: _buildMultiplierButton(3, isTablet),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(height: isTablet ? 20 : 16),
+                
+                // Player/Target buttons - only show enabled ones
+                Expanded(
+                  child: _buildPlayerButtons(isTablet),
+                ),
+                
+                SizedBox(height: isTablet ? 20 : 16),
+                
+                // Action buttons row with strong theme colors
+                SizedBox(
+                  height: isTablet ? 60 : 50,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.error,
+                            foregroundColor: Theme.of(context).colorScheme.onError,
+                            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+                            elevation: 6,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                            ),
+                          ),
+                          onPressed: isGameCompleted ? null : () => _handleMissTap(),
+                          icon: Icon(Icons.close, size: isTablet ? 24 : 20),
+                          label: Text(
+                            'Miss',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: isTablet ? 18 : 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: isTablet ? 16 : 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.secondary,
+                            foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+                            elevation: 6,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                            ),
+                          ),
+                          onPressed: (isGameCompleted || _currentTurnDarts.isEmpty) ? null : () => _handleUndoTap(),
+                          icon: Icon(Icons.undo, size: isTablet ? 24 : 20),
+                          label: Text(
+                            'Undo',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: isTablet ? 18 : 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMultiplierButton(int multiplier, bool isTablet) {
+    final isSelected = _selectedMultiplier == multiplier;
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isSelected 
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: isSelected
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onPrimaryContainer,
+          elevation: isSelected ? 8 : 2,
+          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+          ),
+        ),
+        onPressed: isGameCompleted ? null : () => _handleMultiplierTap(multiplier),
+        child: Text(
+          'x$multiplier',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isTablet ? 20 : 18,
+          ),
         ),
       ),
     );
@@ -812,13 +857,20 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
     setState(() {
       _currentTurnDarts.clear();
       if (!isGameCompleted) {
+        final previousPlayerIndex = currentPlayerIndex;
         _nextPlayer();
+        
+        // Show turn change overlay if player actually changed
+        if (currentPlayerIndex != previousPlayerIndex) {
+          final nextPlayer = players[currentPlayerIndex];
+          _showOverlayAnimation(KillerOverlayType.turnChange, nextPlayer.name);
+        }
       }
     });
   }
 
   /// Build player buttons - only show enabled ones
-  Widget _buildPlayerButtons() {
+  Widget _buildPlayerButtons([bool isTablet = false]) {
     final currentPlayer = players[currentPlayerIndex];
     List<Widget> enabledButtons = [];
     
@@ -855,21 +907,27 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       if (isEnabled) {
         enabledButtons.add(
           Padding(
-            padding: const EdgeInsets.all(4),
+            padding: EdgeInsets.all(isTablet ? 6 : 4),
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: color,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                padding: EdgeInsets.symmetric(
+                  vertical: isTablet ? 20 : 16, 
+                  horizontal: isTablet ? 24 : 20,
+                ),
                 elevation: 6,
                 shadowColor: color.withOpacity(0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                ),
               ),
               onPressed: () => _handlePlayerButtonTap(player.name),
               child: Text(
                 player.name,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: isTablet ? 18 : 16,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -905,11 +963,6 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
 
 /// Represents the result of a single dart throw for display purposes
 class DartResult {
-  final String playerTarget;
-  final int multiplier;
-  final bool isHit;
-  final bool isMiss;
-  final Color? playerColor;
 
   const DartResult({
     required this.playerTarget,
@@ -939,4 +992,9 @@ class DartResult {
       isMiss: true,
     );
   }
+  final String playerTarget;
+  final int multiplier;
+  final bool isHit;
+  final bool isMiss;
+  final Color? playerColor;
 }

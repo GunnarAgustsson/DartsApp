@@ -5,14 +5,14 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 
 /// Displays the best finish options based on the remaining score and darts.
 class PossibleFinishHint extends StatelessWidget {
-  final TraditionalGameController ctrl;
-  final double fontSize;
 
   const PossibleFinishHint({
     Key? key,
     required this.ctrl,
     this.fontSize = 18,
   }) : super(key: key);
+  final TraditionalGameController ctrl;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {

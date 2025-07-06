@@ -13,6 +13,15 @@ import '../screens/donkey_game_screen.dart';
 /// A reusable widget that displays game history with optional player filtering
 /// Can be used in both the main history screen and player info screen
 class GameHistoryView extends StatefulWidget {
+  
+  const GameHistoryView({
+    super.key,
+    this.playerFilter,
+    this.showRefreshButton = true,
+    this.allowDelete = true,
+    this.maxGames,
+    this.emptyStateWidget,
+  });
   /// Optional player name to filter games by. If null, shows all games.
   final String? playerFilter;
   
@@ -27,15 +36,6 @@ class GameHistoryView extends StatefulWidget {
   
   /// Custom empty state widget
   final Widget? emptyStateWidget;
-  
-  const GameHistoryView({
-    super.key,
-    this.playerFilter,
-    this.showRefreshButton = true,
-    this.allowDelete = true,
-    this.maxGames,
-    this.emptyStateWidget,
-  });
 
   @override
   State<GameHistoryView> createState() => _GameHistoryViewState();
@@ -718,7 +718,7 @@ class _GameHistoryViewState extends State<GameHistoryView> {
                 }),
               ],
             );
-          }).toList(),
+          }),
         ],
       ),
     );

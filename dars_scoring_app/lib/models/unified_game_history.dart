@@ -13,26 +13,6 @@ enum GameType {
 
 /// Unified game history model that can represent traditional, cricket, and donkey games
 class UnifiedGameHistory {
-  final String id;
-  final List<String> players;
-  final DateTime createdAt;
-  final DateTime modifiedAt;
-  final String? winner;
-  final DateTime? completedAt;
-  final String gameMode; // 'Cricket', 'Donkey', or numeric like '301', '501'
-  final GameType gameType;
-  
-  // For traditional games
-  final GameHistory? traditionalGame;
-  
-  // For cricket games
-  final CricketGameHistory? cricketGame;
-  
-  // For donkey games
-  final DonkeyGameHistory? donkeyGame;
-  
-  // For killer games
-  final KillerGameHistory? killerGame;
 
   UnifiedGameHistory._({
     required this.id,
@@ -122,6 +102,26 @@ class UnifiedGameHistory {
       return UnifiedGameHistory.fromTraditional(GameHistory.fromJson(json));
     }
   }
+  final String id;
+  final List<String> players;
+  final DateTime createdAt;
+  final DateTime modifiedAt;
+  final String? winner;
+  final DateTime? completedAt;
+  final String gameMode; // 'Cricket', 'Donkey', or numeric like '301', '501'
+  final GameType gameType;
+  
+  // For traditional games
+  final GameHistory? traditionalGame;
+  
+  // For cricket games
+  final CricketGameHistory? cricketGame;
+  
+  // For donkey games
+  final DonkeyGameHistory? donkeyGame;
+  
+  // For killer games
+  final KillerGameHistory? killerGame;
 
   /// Get throws count for display
   int get throwsCount {

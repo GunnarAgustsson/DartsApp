@@ -7,11 +7,6 @@ import 'possible_finish_hint.dart';
 /// Displays the current player's name, score, last darts icons,
 /// and possible finish hint in a styled card.
 class PlayerInfoCard extends StatelessWidget {
-  final TraditionalGameController ctrl;
-  final double playerNameFontSize;
-  final double playerScoreFontSize;
-  final double dartIconSize;
-  final double possibleFinishFontSize;
 
   const PlayerInfoCard({
     Key? key,
@@ -21,6 +16,11 @@ class PlayerInfoCard extends StatelessWidget {
     this.dartIconSize = 32,
     this.possibleFinishFontSize = 16,
   }) : super(key: key);
+  final TraditionalGameController ctrl;
+  final double playerNameFontSize;
+  final double playerScoreFontSize;
+  final double dartIconSize;
+  final double possibleFinishFontSize;
 
   @override
   Widget build(BuildContext context) {

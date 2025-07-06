@@ -17,10 +17,6 @@ import '../widgets/score_button.dart';
 /// Once closed, additional hits score points (if opponents haven't closed it yet)
 /// Win by closing all numbers and having highest score
 class CricketGameScreen extends StatefulWidget {
-  final List<String> players;
-  final CricketGameHistory? gameHistory;
-  final bool randomOrder;
-  final CricketVariant variant;
 
   const CricketGameScreen({
     super.key,
@@ -29,6 +25,10 @@ class CricketGameScreen extends StatefulWidget {
     this.randomOrder = false,
     this.variant = CricketVariant.standard,
   });
+  final List<String> players;
+  final CricketGameHistory? gameHistory;
+  final bool randomOrder;
+  final CricketVariant variant;
 
   @override
   State<CricketGameScreen> createState() => _CricketGameScreenState();
@@ -887,7 +887,7 @@ class _CricketGameScreenState extends State<CricketGameScreen>
                 padding: const EdgeInsets.all(AppDimensions.paddingS),
                 child: TextButton(
                   onPressed: () => setState(() => _showScoreboardDropdown = false),
-                  child: Text('Close'),
+                  child: const Text('Close'),
                 ),
               ),
             ],
