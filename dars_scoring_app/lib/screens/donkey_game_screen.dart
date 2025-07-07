@@ -4,7 +4,7 @@ import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/services/donkey_game_service.dart';
 import 'package:dars_scoring_app/theme/index.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
-import 'package:dars_scoring_app/widgets/old_overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/game_overlay_animation.dart';
 import 'package:dars_scoring_app/widgets/scoring_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -490,33 +490,42 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     final showLetterReceived = _ctrl.showLetterReceived;
     final showPlayerEliminated = _ctrl.showPlayerEliminated;
     
-    return Visibility(
-      visible: showTurnChange || showLetterReceived || showPlayerEliminated,
-      child: GestureDetector(
-        onTap: () {
-          if (showLetterReceived) {
-            _ctrl.clearLetterReceivedFlag();
-          } else if (showPlayerEliminated) {
-            _ctrl.clearPlayerEliminatedFlag();
-          }
-        },
-        child: AnimatedOpacity(
-          opacity: (showTurnChange || showLetterReceived || showPlayerEliminated) ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 300),
-          child: OverlayAnimation(
-            showBust: false,
-            showTurnChange: showTurnChange,
-            showLetterReceived: showLetterReceived,
-            showPlayerEliminated: showPlayerEliminated,
-            lastTurnPoints: showTurnChange ? _ctrl.lastTurnScore.toString() : _ctrl.currentTurnScore.toString(),
-            lastTurnLabels: _ctrl.currentTurnDartLabels.join(', '),
-            nextPlayerName: showTurnChange ? _ctrl.players[_ctrl.currentPlayer] : nextPlayerName,
-            letterReceivedPlayer: _ctrl.letterReceivedPlayer ?? _ctrl.eliminatedPlayer ?? '',
-            letterReceivedLetters: _ctrl.letterReceivedLetters ?? '',
-            animationDuration: _ctrl.animationDuration,
-          ),
-        ),
-      ),
+    if (!showTurnChange && !showLetterReceived && !showPlayerEliminated) {
+      return const SizedBox.shrink();
+    }
+
+    GameOverlayType overlayType;
+    if (showLetterReceived) {
+      overlayType = GameOverlayType.letterReceived;
+    } else if (showPlayerEliminated) {
+      overlayType = GameOverlayType.playerEliminated;
+    } else {
+      overlayType = GameOverlayType.turnChange;
+    }
+
+    return GameOverlayAnimation(
+      overlayType: overlayType,
+      isVisible: showTurnChange || showLetterReceived || showPlayerEliminated,
+      playerName: _ctrl.letterReceivedPlayer ?? _ctrl.eliminatedPlayer ?? '',
+      nextPlayerName: showTurnChange ? _ctrl.players[_ctrl.currentPlayer] : nextPlayerName,
+      lastTurnPoints: showTurnChange ? _ctrl.lastTurnScore.toString() : _ctrl.currentTurnScore.toString(),
+      lastTurnLabels: _ctrl.currentTurnDartLabels.join(', '),
+      letterReceivedLetters: _ctrl.letterReceivedLetters ?? '',
+      animationDuration: _ctrl.animationDuration,
+      onAnimationComplete: () {
+        if (showLetterReceived) {
+          _ctrl.clearLetterReceivedFlag();
+        } else if (showPlayerEliminated) {
+          _ctrl.clearPlayerEliminatedFlag();
+        }
+      },
+      onTapToClose: () {
+        if (showLetterReceived) {
+          _ctrl.clearLetterReceivedFlag();
+        } else if (showPlayerEliminated) {
+          _ctrl.clearPlayerEliminatedFlag();
+        }
+      },
     );
   }
 

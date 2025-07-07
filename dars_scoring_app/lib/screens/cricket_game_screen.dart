@@ -5,7 +5,7 @@ import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/services/cricket_game_service.dart';
 import 'package:dars_scoring_app/theme/app_dimensions.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
-import 'package:dars_scoring_app/widgets/old_overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/game_overlay_animation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -756,19 +756,23 @@ class _CricketGameScreenState extends State<CricketGameScreen>
 
   /// Build overlay for turn change animation
   Widget _buildOverlayAnimation(bool showTurnChange, String nextPlayerName) {
-    return Visibility(
-      visible: showTurnChange,
-      child: AnimatedOpacity(
-        opacity: showTurnChange ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),        child: OverlayAnimation(
-          showBust: false,
-          showTurnChange: showTurnChange,
-          lastTurnPoints: '', // Cricket doesn't show points like traditional
-          lastTurnLabels: _ctrl.lastTurnLabels(),
-          nextPlayerName: nextPlayerName,
-          animationDuration: _ctrl.animationDuration,
-        ),
-      ),
+    if (!showTurnChange) {
+      return const SizedBox.shrink();
+    }
+
+    return GameOverlayAnimation(
+      overlayType: GameOverlayType.turnChange,
+      isVisible: showTurnChange,
+      nextPlayerName: nextPlayerName,
+      lastTurnPoints: '', // Cricket doesn't show points like traditional
+      lastTurnLabels: _ctrl.lastTurnLabels(),
+      animationDuration: _ctrl.animationDuration,
+      onAnimationComplete: () {
+        // Cricket controller might need a method to clear turn change flag
+      },
+      onTapToClose: () {
+        // Cricket controller might need a method to clear turn change flag
+      },
     );
   }
     /// Build scoreboard dropdown overlay

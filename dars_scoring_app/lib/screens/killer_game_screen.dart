@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/killer_player.dart';
@@ -8,6 +9,7 @@ import '../services/killer_game_history_service.dart';
 import '../widgets/interactive_dartboard.dart';
 import '../widgets/dart_icon.dart';
 import '../widgets/game_overlay_animation.dart';
+import '../theme/app_dimensions.dart';
 
 /// Main screen for playing Killer darts game
 class KillerGameScreen extends StatefulWidget {
@@ -711,33 +713,70 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
 
   Widget _buildMultiplierButton(int multiplier, bool isTablet) {
     final isSelected = _selectedMultiplier == multiplier;
+    final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final isLandscape = size.width > size.height;
     
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isSelected 
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.primaryContainer,
-          foregroundColor: isSelected
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onPrimaryContainer,
-          elevation: isSelected ? 8 : 2,
-          shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
-          ),
-        ),
-        onPressed: isGameCompleted ? null : () => _handleMultiplierTap(multiplier),
-        child: Text(
-          'x$multiplier',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: isTablet ? 20 : 18,
-          ),
-        ),
-      ),
+    // Use the same height calculation as Miss/Undo buttons in scoring_buttons.dart
+    final buttonHeight = isLandscape 
+        ? max(40.0, size.height * 0.075) 
+        : max(45.0, size.height * 0.055);
+    
+    return SizedBox(
+      height: buttonHeight,
+      child: isSelected
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    (multiplier == 2 ? theme.colorScheme.secondary : theme.colorScheme.tertiary).withValues(alpha: 0.7),
+                    (multiplier == 2 ? theme.colorScheme.secondary : theme.colorScheme.tertiary),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: (multiplier == 2 ? theme.colorScheme.secondary : theme.colorScheme.tertiary).withValues(alpha: 0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+                  ),
+                ),
+                onPressed: isGameCompleted ? null : () => _handleMultiplierTap(multiplier),
+                child: Text(
+                  'x$multiplier',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            )
+          : OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: multiplier == 2 ? theme.colorScheme.secondary : theme.colorScheme.tertiary,
+                side: BorderSide(
+                  color: (multiplier == 2 ? theme.colorScheme.secondary : theme.colorScheme.tertiary).withValues(alpha: 0.4), 
+                  width: 1.5
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+                ),
+              ),
+              onPressed: isGameCompleted ? null : () => _handleMultiplierTap(multiplier),
+              child: Text('x$multiplier', style: const TextStyle(fontSize: 18)),
+            ),
     );
   }
 

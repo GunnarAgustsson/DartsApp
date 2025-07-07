@@ -3,7 +3,7 @@ import 'package:dars_scoring_app/models/game_history.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
 import 'package:dars_scoring_app/theme/app_dimensions.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
-import 'package:dars_scoring_app/widgets/old_overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/game_overlay_animation.dart';
 import 'package:dars_scoring_app/widgets/scoring_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -430,20 +430,25 @@ class _GameScreenState extends State<GameScreen>
     bool showTurnChange, 
     String? nextPlayerName
   ) {
-    return Visibility(
-      visible: showBust || showTurnChange,
-      child: AnimatedOpacity(
-        opacity: showBust || showTurnChange ? 1.0 : 0.0,
-        duration: _ctrl.overlayAnimationDuration,
-        child: OverlayAnimation(
-          showBust: showBust,
-          showTurnChange: showTurnChange,
-          lastTurnPoints: _ctrl.lastTurnPoints(),
-          lastTurnLabels: _ctrl.lastTurnLabels(),
-          nextPlayerName: nextPlayerName ?? '',
-          animationDuration: _ctrl.overlayAnimationDuration,
-        ),
-      ),
+    if (!showBust && !showTurnChange) {
+      return const SizedBox.shrink();
+    }
+
+    return GameOverlayAnimation(
+      overlayType: showBust ? GameOverlayType.bust : GameOverlayType.turnChange,
+      isVisible: showBust || showTurnChange,
+      nextPlayerName: nextPlayerName ?? '',
+      lastTurnPoints: _ctrl.lastTurnPoints(),
+      lastTurnLabels: _ctrl.lastTurnLabels(),
+      animationDuration: _ctrl.overlayAnimationDuration,
+      onAnimationComplete: () {
+        _ctrl.showBust = false;
+        _ctrl.showTurnChange = false;
+      },
+      onTapToClose: () {
+        _ctrl.showBust = false;
+        _ctrl.showTurnChange = false;
+      },
     );
   }
   

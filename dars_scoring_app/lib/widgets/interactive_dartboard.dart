@@ -503,11 +503,26 @@ class DartboardPainter extends CustomPainter {
     // Build path around the group
     final path = Path();
     
-    // Start at left edge of first segment, inner radius
+    // Calculate angles for the group
     final firstIdx = group.first;
     final lastIdx = group.last;
     final startAngle = (firstIdx * 18 - 9 - 180) * math.pi / 180;
     final endAngle = ((lastIdx) * 18 + 9 - 180) * math.pi / 180;
+    
+    // Calculate the actual arc sweep, handling wrap-around
+    double sweepAngle = endAngle - startAngle;
+    
+    // Fix wrap-around: if we're spanning across 0° (like from segment 19 to segment 0)
+    // the sweep angle might be negative or too large
+    if (sweepAngle < 0) {
+      sweepAngle += 2 * math.pi;
+    }
+    
+    // If the sweep is more than 180°, we likely have a wrap-around issue
+    // In this case, use the shorter path
+    if (sweepAngle > math.pi) {
+      sweepAngle = sweepAngle - 2 * math.pi;
+    }
     
     // Move to start of first segment, inner radius
     path.moveTo(
@@ -525,7 +540,7 @@ class DartboardPainter extends CustomPainter {
     path.arcTo(
       Rect.fromCircle(center: center, radius: outerRadius),
       startAngle + math.pi / 2,
-      endAngle - startAngle,
+      sweepAngle,
       false,
     );
     
@@ -535,11 +550,11 @@ class DartboardPainter extends CustomPainter {
       center.dy + math.sin(endAngle + math.pi / 2) * innerRadius,
     );
     
-    // Arc along inner edge back to start (fix direction)
+    // Arc along inner edge back to start (reverse direction)
     path.arcTo(
       Rect.fromCircle(center: center, radius: innerRadius),
       endAngle + math.pi / 2,
-      -(endAngle - startAngle), // Negative angle for correct direction
+      -sweepAngle, // Negative for correct direction
       false,
     );
     
