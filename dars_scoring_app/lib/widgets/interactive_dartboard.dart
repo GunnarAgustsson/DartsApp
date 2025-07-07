@@ -184,10 +184,14 @@ class DartboardPainter extends CustomPainter {
     final radius = dartboardSize / 2; // Use dartboardSize instead of canvas size
 
     // Define dartboard colors
-    final blackPaint = Paint()..color = Colors.black;
-    final whitePaint = Paint()..color = Colors.white;
-    final redPaint = Paint()..color = Colors.red;
-    final greenPaint = Paint()..color = Colors.green;
+    //final blackPaint = Paint()..color = Colors.black;
+    //final whitePaint = Paint()..color = Colors.white;
+    //final redPaint = Paint()..color = Colors.red;
+    //final greenPaint = Paint()..color = Colors.green;
+    final blackPaint = Paint()..color = const Color.fromARGB(255, 34, 33, 33);
+    final whitePaint = Paint()..color = const Color.fromARGB(255, 207, 202, 125);
+    final redPaint = Paint()..color = const Color.fromARGB(255, 158, 45, 37);
+    final greenPaint = Paint()..color = const Color.fromARGB(255, 94, 145, 13);
     final highlightPaint = Paint()..color = const Color(0xFFFF8C00).withOpacity(0.9); // More opaque orange
     final hoverPaint = Paint()..color = const Color(0xFFFF8C00).withOpacity(0.5);
 
@@ -266,7 +270,7 @@ class DartboardPainter extends CustomPainter {
       canvas.drawCircle(center, radius * 0.05, hoverPaint);
     }
 
-    // Draw ring dividers with wider lines
+    // Draw ring dividers with wider lines (excluding bull border)
     final ringPaint = Paint()
       ..color = Colors.black
       ..strokeWidth = 3 // Wider outlines
@@ -531,11 +535,11 @@ class DartboardPainter extends CustomPainter {
       center.dy + math.sin(endAngle + math.pi / 2) * innerRadius,
     );
     
-    // Arc along inner edge back to start
+    // Arc along inner edge back to start (fix direction)
     path.arcTo(
       Rect.fromCircle(center: center, radius: innerRadius),
       endAngle + math.pi / 2,
-      startAngle - endAngle,
+      -(endAngle - startAngle), // Negative angle for correct direction
       false,
     );
     

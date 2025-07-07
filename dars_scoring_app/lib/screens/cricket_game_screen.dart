@@ -5,7 +5,7 @@ import 'package:dars_scoring_app/models/app_enums.dart';
 import 'package:dars_scoring_app/services/cricket_game_service.dart';
 import 'package:dars_scoring_app/theme/app_dimensions.dart';
 import 'package:dars_scoring_app/utils/string_utils.dart';
-import 'package:dars_scoring_app/widgets/overlay_animation.dart';
+import 'package:dars_scoring_app/widgets/old_overlay_animation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 

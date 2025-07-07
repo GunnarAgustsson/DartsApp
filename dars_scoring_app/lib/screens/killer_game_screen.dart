@@ -7,7 +7,7 @@ import '../services/killer_game_state_service.dart';
 import '../services/killer_game_history_service.dart';
 import '../widgets/interactive_dartboard.dart';
 import '../widgets/dart_icon.dart';
-import '../widgets/killer_overlay_animation.dart';
+import '../widgets/game_overlay_animation.dart';
 
 /// Main screen for playing Killer darts game
 class KillerGameScreen extends StatefulWidget {
@@ -47,7 +47,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
 
   // Overlay animation state
   bool _showOverlay = false;
-  KillerOverlayType? _overlayType;
+  GameOverlayType? _overlayType;
   String _overlayPlayerName = '';
 
   @override
@@ -132,7 +132,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
         );
         
         if (isKiller && !currentPlayer.isKiller) {
-          _showOverlayAnimation(KillerOverlayType.playerBecomesKiller, currentPlayer.name);
+          _showOverlayAnimation(GameOverlayType.playerBecomesKiller, currentPlayer.name);
         }
       }
       
@@ -150,7 +150,6 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
             final newHealth = targetPlayer.health - damageDealt;
             
             // If player loses health and was a killer, they lose killer status
-            final wasKiller = targetPlayer.isKiller;
             final isStillKiller = newHealth >= 3;
             
             players[i] = targetPlayer.copyWith(
@@ -158,13 +157,11 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
               isKiller: isStillKiller,
             );
             
-            // Show feedback for killer status loss or elimination
+            // Show feedback for elimination
             if (newHealth < 0) {
-              _showOverlayAnimation(KillerOverlayType.playerEliminated, targetPlayer.name);
-            } else if (wasKiller && !isStillKiller) {
-              // Player lost killer status but isn't eliminated
-              _showOverlayAnimation(KillerOverlayType.turnChange, '${targetPlayer.name} lost killer status!');
+              _showOverlayAnimation(GameOverlayType.killerEliminated, targetPlayer.name);
             }
+            // Note: No overlay for losing killer status per user request
             break; // Only one player can be hit per dart
           }
         }
@@ -362,7 +359,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
   }
 
   /// Show overlay animation for game events
-  void _showOverlayAnimation(KillerOverlayType type, String playerName) {
+  void _showOverlayAnimation(GameOverlayType type, String playerName) {
     setState(() {
       _overlayType = type;
       _overlayPlayerName = playerName;
@@ -464,11 +461,16 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
             _buildGameContent(context, currentPlayer),
             
             // Overlay animation
-            KillerOverlayAnimation(
-              overlayType: _overlayType ?? KillerOverlayType.turnChange,
+            GameOverlayAnimation(
+              overlayType: _overlayType ?? GameOverlayType.killerTurnChange,
               playerName: _overlayPlayerName,
               isVisible: _showOverlay,
               onAnimationComplete: () {
+                setState(() {
+                  _showOverlay = false;
+                });
+              },
+              onTapToClose: () {
                 setState(() {
                   _showOverlay = false;
                 });
@@ -863,13 +865,13 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
         // Show turn change overlay if player actually changed
         if (currentPlayerIndex != previousPlayerIndex) {
           final nextPlayer = players[currentPlayerIndex];
-          _showOverlayAnimation(KillerOverlayType.turnChange, nextPlayer.name);
+          _showOverlayAnimation(GameOverlayType.killerTurnChange, nextPlayer.name);
         }
       }
     });
   }
 
-  /// Build player buttons - only show enabled ones
+  /// Build player buttons - only show enabled ones with smart layout
   Widget _buildPlayerButtons([bool isTablet = false]) {
     final currentPlayer = players[currentPlayerIndex];
     List<Widget> enabledButtons = [];
@@ -905,31 +907,107 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       }
       
       if (isEnabled) {
-        enabledButtons.add(
-          Padding(
-            padding: EdgeInsets.all(isTablet ? 6 : 4),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  vertical: isTablet ? 20 : 16, 
-                  horizontal: isTablet ? 24 : 20,
-                ),
-                elevation: 6,
-                shadowColor: color.withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+        // Create status indicators
+        List<Widget> statusIndicators = [];
+        
+        // Health indicators
+        for (int i = 0; i < 3; i++) {
+          statusIndicators.add(
+            Container(
+              width: isTablet ? 8 : 6,
+              height: isTablet ? 8 : 6,
+              margin: EdgeInsets.symmetric(horizontal: isTablet ? 1.5 : 1),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < player.health 
+                    ? Colors.white.withOpacity(0.9)
+                    : Colors.white.withOpacity(0.3),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.5),
+                  width: 0.5,
                 ),
               ),
-              onPressed: () => _handlePlayerButtonTap(player.name),
-              child: Text(
-                player.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: isTablet ? 18 : 16,
+            ),
+          );
+        }
+        
+        enabledButtons.add(
+          Container(
+            margin: EdgeInsets.all(isTablet ? 4 : 3),
+            child: Material(
+              elevation: player.isKiller ? 12 : 8,
+              shadowColor: color.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
+                onTap: () => _handlePlayerButtonTap(player.name),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        color,
+                        color.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
+                    border: player.isKiller ? Border.all(
+                      color: Colors.white,
+                      width: 2,
+                    ) : null,
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    vertical: isTablet ? 16 : 14,
+                    horizontal: isTablet ? 20 : 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Player name
+                      Text(
+                        player.name,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: player.isKiller ? FontWeight.w900 : FontWeight.bold,
+                          fontSize: isTablet ? 16 : 14,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(1, 1),
+                              blurRadius: 2,
+                              color: Colors.black.withOpacity(0.3),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      
+                      SizedBox(height: isTablet ? 6 : 4),
+                      
+                      // Health indicators
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: statusIndicators,
+                      ),
+                      
+                      // Killer indicator
+                      if (player.isKiller) ...[
+                        SizedBox(height: isTablet ? 4 : 3),
+                        Text(
+                          'KILLER',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isTablet ? 10 : 8,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
@@ -949,14 +1027,47 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
       );
     }
     
-    // Use a Wrap to dynamically arrange buttons
-    return Center(
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: enabledButtons,
-      ),
+    // Smart layout based on number of buttons and screen size
+    return _buildSmartButtonLayout(enabledButtons, isTablet);
+  }
+  
+  /// Build smart button layout that adapts to player count and screen size
+  Widget _buildSmartButtonLayout(List<Widget> buttons, bool isTablet) {
+    final buttonCount = buttons.length;
+    
+    // For 2-3 players: single row
+    if (buttonCount <= 3) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: buttons.map((button) => Expanded(
+          child: button,
+        )).toList(),
+      );
+    }
+    
+    // For 4+ players: use a grid layout
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate optimal columns based on available width and button count
+        int columns = 2;
+        if (buttonCount == 4) {
+          columns = 2; // 2x2 grid
+        } else if (buttonCount == 5) {
+          columns = isTablet ? 3 : 2; // 3x2 or 2x3 depending on space
+        } else if (buttonCount >= 6) {
+          columns = isTablet ? 3 : 2; // 3x2 or 2x3
+        }
+        
+        return GridView.count(
+          crossAxisCount: columns,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: isTablet ? 2.2 : 2.0,
+          mainAxisSpacing: isTablet ? 8 : 6,
+          crossAxisSpacing: isTablet ? 8 : 6,
+          children: buttons,
+        );
+      },
     );
   }
 }
