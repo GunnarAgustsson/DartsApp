@@ -7,10 +7,10 @@ import 'package:dars_scoring_app/data/possible_finishes.dart';
 class PossibleFinishHint extends StatelessWidget {
 
   const PossibleFinishHint({
-    Key? key,
+    super.key,
     required this.ctrl,
     this.fontSize = 18,
-  }) : super(key: key);
+  });
   final TraditionalGameController ctrl;
   final double fontSize;
 

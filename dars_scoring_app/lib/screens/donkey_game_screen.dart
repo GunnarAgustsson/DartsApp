@@ -186,6 +186,10 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
                 ? _buildLandscapeLayout(context, showTurnChange, isTurnChanging)
                 : _buildPortraitLayout(context, showTurnChange, isTurnChanging),
           ),
+          
+          // Overlay animation covering entire screen except header
+          _buildOverlayAnimation(showTurnChange, _nextPlayerName),
+          
           // Player status dropdown overlay
           if (_showPlayerStatus)
             _buildPlayerStatusDropdown(),
@@ -201,7 +205,6 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     bool isTurnChanging,
   ) {    final theme = Theme.of(context);
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _nextPlayerName;
 
     return Row(
       children: [
@@ -210,12 +213,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
           flex: 2,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
-            child: Stack(
-              children: [
-                _buildCurrentPlayerCard(context),
-                _buildOverlayAnimation(showTurnChange, nextPlayerName),
-              ],
-            ),
+            child: _buildCurrentPlayerCard(context),
           ),
         ),
         
@@ -251,7 +249,6 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     bool isTurnChanging,
   ) {
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _nextPlayerName;
 
     return Column(
       children: [
@@ -260,12 +257,7 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
           flex: 3,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
-            child: Stack(
-              children: [
-                _buildCurrentPlayerCard(context),
-                _buildOverlayAnimation(showTurnChange, nextPlayerName),
-              ],
-            ),
+            child: _buildCurrentPlayerCard(context),
           ),
         ),
 
@@ -490,10 +482,6 @@ class _DonkeyGameScreenState extends State<DonkeyGameScreen>
     final showLetterReceived = _ctrl.showLetterReceived;
     final showPlayerEliminated = _ctrl.showPlayerEliminated;
     
-    if (!showTurnChange && !showLetterReceived && !showPlayerEliminated) {
-      return const SizedBox.shrink();
-    }
-
     GameOverlayType overlayType;
     if (showLetterReceived) {
       overlayType = GameOverlayType.letterReceived;

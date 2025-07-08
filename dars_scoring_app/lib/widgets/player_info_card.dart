@@ -9,13 +9,13 @@ import 'possible_finish_hint.dart';
 class PlayerInfoCard extends StatelessWidget {
 
   const PlayerInfoCard({
-    Key? key,
+    super.key,
     required this.ctrl,
     this.playerNameFontSize = 32,
     this.playerScoreFontSize = 64,
     this.dartIconSize = 32,
     this.possibleFinishFontSize = 16,
-  }) : super(key: key);
+  });
   final TraditionalGameController ctrl;
   final double playerNameFontSize;
   final double playerScoreFontSize;

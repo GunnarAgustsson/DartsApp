@@ -137,7 +137,8 @@ class _CricketGameScreenState extends State<CricketGameScreen>
   Widget build(BuildContext context) {
     final showTurnChange = _ctrl.showTurnChange;
     final isTurnChanging = _ctrl.isTurnChanging;
-      final size = MediaQuery.of(context).size;
+    final nextPlayerName = _ctrl.players[(_ctrl.currentPlayer + 1) % _ctrl.players.length];
+    final size = MediaQuery.of(context).size;
     final width = size.width;
     final height = size.height;
     final isLandscape = width > height;
@@ -181,7 +182,11 @@ class _CricketGameScreenState extends State<CricketGameScreen>
                 ? _buildLandscapeLayout(context, showTurnChange, isTurnChanging)
                 : _buildPortraitLayout(context, showTurnChange, isTurnChanging),
           ),
-            // Scoreboard dropdown overlay
+          
+          // Overlay animation covering entire screen except header
+          _buildOverlayAnimation(showTurnChange, nextPlayerName),
+          
+          // Scoreboard dropdown overlay
           if (_showScoreboardDropdown)
             _buildScoreboardDropdown(),
         ],
@@ -196,7 +201,6 @@ class _CricketGameScreenState extends State<CricketGameScreen>
   ) {
     final theme = Theme.of(context);
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _ctrl.players[(_ctrl.currentPlayer + 1) % _ctrl.players.length];
 
     return Row(
       children: [
@@ -205,12 +209,7 @@ class _CricketGameScreenState extends State<CricketGameScreen>
           flex: 2,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
-            child: Stack(
-              children: [
-                _buildCurrentPlayerCard(context),
-                _buildOverlayAnimation(showTurnChange, nextPlayerName),
-              ],
-            ),
+            child: _buildCurrentPlayerCard(context),
           ),
         ),
         
@@ -261,7 +260,6 @@ class _CricketGameScreenState extends State<CricketGameScreen>
   ) {
     final size = MediaQuery.of(context).size;
     final isDisabled = isTurnChanging || showTurnChange;
-    final nextPlayerName = _ctrl.players[(_ctrl.currentPlayer + 1) % _ctrl.players.length];
 
     return Column(
       children: [
@@ -270,12 +268,7 @@ class _CricketGameScreenState extends State<CricketGameScreen>
           flex: 3,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
-            child: Stack(
-              children: [
-                _buildCurrentPlayerCard(context),
-                _buildOverlayAnimation(showTurnChange, nextPlayerName),
-              ],
-            ),
+            child: _buildCurrentPlayerCard(context),
           ),
         ),
 
@@ -756,10 +749,6 @@ class _CricketGameScreenState extends State<CricketGameScreen>
 
   /// Build overlay for turn change animation
   Widget _buildOverlayAnimation(bool showTurnChange, String nextPlayerName) {
-    if (!showTurnChange) {
-      return const SizedBox.shrink();
-    }
-
     return GameOverlayAnimation(
       overlayType: GameOverlayType.turnChange,
       isVisible: showTurnChange,
@@ -768,10 +757,10 @@ class _CricketGameScreenState extends State<CricketGameScreen>
       lastTurnLabels: _ctrl.lastTurnLabels(),
       animationDuration: _ctrl.animationDuration,
       onAnimationComplete: () {
-        // Cricket controller might need a method to clear turn change flag
+        _ctrl.showTurnChange = false;
       },
       onTapToClose: () {
-        // Cricket controller might need a method to clear turn change flag
+        _ctrl.dismissOverlays();
       },
     );
   }

@@ -99,6 +99,8 @@ class _GameOverlayAnimationState extends State<GameOverlayAnimation>
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<Color?> _colorAnimation;
+  
+  bool _isCompleted = false; // Track if animation has already completed
 
   @override
   void initState() {
@@ -151,6 +153,7 @@ class _GameOverlayAnimationState extends State<GameOverlayAnimation>
     super.didUpdateWidget(oldWidget);
     
     if (widget.isVisible && !oldWidget.isVisible) {
+      _isCompleted = false; // Reset completion flag when showing new animation
       _showAnimation();
     } else if (!widget.isVisible && oldWidget.isVisible) {
       _hideAnimation();
@@ -163,27 +166,45 @@ class _GameOverlayAnimationState extends State<GameOverlayAnimation>
     
     // Auto-hide after specified duration
     await Future.delayed(widget.displayDuration);
-    if (mounted && widget.isVisible) {
+    if (mounted && widget.isVisible && !_isCompleted) {
       _hideAnimation();
     }
   }
 
   void _hideAnimation() async {
+    if (_isCompleted) return; // Prevent duplicate calls
+    
     await _scaleController.reverse();
     await _fadeController.reverse();
     
-    if (mounted) {
+    if (mounted && !_isCompleted) {
+      _isCompleted = true;
       widget.onAnimationComplete?.call();
     }
   }
 
   void _handleTap() {
+    if (_isCompleted) return; // Prevent duplicate calls
+    
     // Provide haptic feedback
     HapticFeedback.lightImpact();
     
-    // Close animation early
+    // Mark as completed first to prevent double execution
+    _isCompleted = true;
+    
+    // Trigger the tap callback first (this might change player turns, etc.)
     widget.onTapToClose?.call();
-    _hideAnimation();
+    
+    // Then trigger the completion callback
+    widget.onAnimationComplete?.call();
+    
+    // Hide animation quickly without triggering onAnimationComplete again
+    _hideAnimationQuick();
+  }
+
+  void _hideAnimationQuick() async {
+    _scaleController.reset();
+    _fadeController.reset();
   }
 
   Color _getBackgroundColor() {
@@ -376,7 +397,7 @@ class _GameOverlayAnimationState extends State<GameOverlayAnimation>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '${widget.playerName}',
+              widget.playerName,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: secondaryFontSize,
@@ -432,7 +453,7 @@ class _GameOverlayAnimationState extends State<GameOverlayAnimation>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '${widget.playerName}',
+              widget.playerName,
               style: AppTextStyles.bustOverlay().copyWith(
                 fontSize: secondaryFontSize,
                 fontWeight: FontWeight.bold,

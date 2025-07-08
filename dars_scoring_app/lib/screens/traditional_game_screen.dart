@@ -252,7 +252,7 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
 
-      // Body stack: main game UI + optional next-player list
+      // Body stack: main game UI + overlay + optional next-player list
       body: Stack(
         children: [
           SafeArea(
@@ -260,6 +260,9 @@ class _GameScreenState extends State<GameScreen>
                 ? _buildLandscapeLayout(context, showBust, showTurnChange, isTurnChanging, act, curIdx, nxtIdx, actScores)
                 : _buildPortraitLayout(context, showBust, showTurnChange, isTurnChanging, act, curIdx, nxtIdx, actScores),
           ),
+
+          // ---- 5b) Overlay animations covering entire screen ----
+          _buildOverlayAnimation(showBust, showTurnChange, act[nxtIdx]),
 
           // ---- 5c) Next-player dropdown overlay ----
           if (_showNextList)
@@ -282,7 +285,6 @@ class _GameScreenState extends State<GameScreen>
   ) {
     final theme = Theme.of(context);
     final isDisabled = isTurnChanging || showBust || showTurnChange;
-    final nextPlayerName = activePlayers[nxtIdx];
     
     return Row(
       children: [
@@ -294,21 +296,13 @@ class _GameScreenState extends State<GameScreen>
             child: Column(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      // Core player info
-                      _buildPlayerInfoCard(
-                        context,
-                        activePlayers[curIdx],
-                        actScores[curIdx],
-                        _ctrl.averageScoreFor(activePlayers[curIdx]),
-                        _ctrl.dartsThrown,
-                        _getBestFinish(actScores[curIdx], 3 - _ctrl.dartsThrown),
-                      ),
-                      
-                      // Overlay animations
-                      _buildOverlayAnimation(showBust, showTurnChange, nextPlayerName),
-                    ],
+                  child: _buildPlayerInfoCard(
+                    context,
+                    activePlayers[curIdx],
+                    actScores[curIdx],
+                    _ctrl.averageScoreFor(activePlayers[curIdx]),
+                    _ctrl.dartsThrown,
+                    _getBestFinish(actScores[curIdx], 3 - _ctrl.dartsThrown),
                   ),
                 ),
               ],
@@ -365,7 +359,6 @@ class _GameScreenState extends State<GameScreen>
     List<int> actScores,
   ) {
     final isDisabled = isTurnChanging || showBust || showTurnChange;
-    final nextPlayerName = activePlayers[nxtIdx];
 
     // Define flex factors for layout proportions
     const playerInfoFlex = 3;
@@ -378,18 +371,13 @@ class _GameScreenState extends State<GameScreen>
           flex: playerInfoFlex,
           child: Padding(
             padding: const EdgeInsets.only(top: AppDimensions.marginM),
-            child: Stack(
-              children: [
-                _buildPlayerInfoCard(
-                  context,
-                  activePlayers[curIdx],
-                  actScores[curIdx],
-                  _ctrl.averageScoreFor(activePlayers[curIdx]),
-                  _ctrl.dartsThrown,
-                  _getBestFinish(actScores[curIdx], 3 - _ctrl.dartsThrown),
-                ),
-                _buildOverlayAnimation(showBust, showTurnChange, nextPlayerName),
-              ],
+            child: _buildPlayerInfoCard(
+              context,
+              activePlayers[curIdx],
+              actScores[curIdx],
+              _ctrl.averageScoreFor(activePlayers[curIdx]),
+              _ctrl.dartsThrown,
+              _getBestFinish(actScores[curIdx], 3 - _ctrl.dartsThrown),
             ),
           ),
         ),
@@ -430,10 +418,6 @@ class _GameScreenState extends State<GameScreen>
     bool showTurnChange, 
     String? nextPlayerName
   ) {
-    if (!showBust && !showTurnChange) {
-      return const SizedBox.shrink();
-    }
-
     return GameOverlayAnimation(
       overlayType: showBust ? GameOverlayType.bust : GameOverlayType.turnChange,
       isVisible: showBust || showTurnChange,
@@ -446,8 +430,7 @@ class _GameScreenState extends State<GameScreen>
         _ctrl.showTurnChange = false;
       },
       onTapToClose: () {
-        _ctrl.showBust = false;
-        _ctrl.showTurnChange = false;
+        _ctrl.dismissOverlays();
       },
     );
   }
@@ -687,15 +670,6 @@ class _GameScreenState extends State<GameScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Darts: ',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontSize: isTablet ? 18 : 16,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     ...List.generate(3, (index) {
                       final isThrown = index < dartsThrownInTurn;
                       final dartLabels = _ctrl.currentTurnDartLabels;
@@ -704,10 +678,10 @@ class _GameScreenState extends State<GameScreen>
                           : null;
 
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
                         child: Container(
-                          width: isTablet ? 32 : 28,
-                          height: isTablet ? 32 : 28,
+                          width: isTablet ? 50 : 44, // Increased from 40/36
+                          height: isTablet ? 50 : 44, // Increased from 40/36
                           decoration: BoxDecoration(
                             color: isThrown
                                 ? theme.colorScheme.primary.withOpacity(0.8)
@@ -716,36 +690,35 @@ class _GameScreenState extends State<GameScreen>
                               color: theme.colorScheme.primary,
                               width: 2,
                             ),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              SvgPicture.asset(
-                                'assets/icons/dart-icon.svg',
-                                width: isTablet ? 20 : 18,
-                                height: isTablet ? 20 : 18,
-                                colorFilter: ColorFilter.mode(
-                                  isThrown
-                                      ? Colors.white
-                                      : theme.colorScheme.primary,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                              if (isThrown && label != null)
-                                Positioned(
-                                  bottom: 2,
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isTablet ? 10 : 8,
+                          child: isThrown && label != null
+                              ? Center(
+                                  // Show only the score text when dart is thrown
+                                  child: FittedBox(
+                                    fit: BoxFit.contain,
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: isTablet ? 14 : 12,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  // Show dart icon when not thrown
+                                  child: SvgPicture.asset(
+                                    'assets/icons/dart-icon.svg',
+                                    width: isTablet ? 32 : 28, // Increased from 26/24
+                                    height: isTablet ? 32 : 28, // Increased from 26/24
+                                    colorFilter: ColorFilter.mode(
+                                      theme.colorScheme.primary,
+                                      BlendMode.srcIn,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
                         ),
                       );
                     }),

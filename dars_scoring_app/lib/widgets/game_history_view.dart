@@ -9,6 +9,7 @@ import '../models/app_enums.dart';
 import '../screens/traditional_game_screen.dart';
 import '../screens/cricket_game_screen.dart';
 import '../screens/donkey_game_screen.dart';
+import '../screens/killer_game_screen.dart';
 
 /// A reusable widget that displays game history with optional player filtering
 /// Can be used in both the main history screen and player info screen
@@ -186,6 +187,18 @@ class _GameHistoryViewState extends State<GameHistoryView> {
         donkeyGamesRaw.removeAt(rawIdx);
         await prefs.setStringList('donkey_games', donkeyGamesRaw);
       }
+    } else if (gameToDelete.gameType == GameType.killer) {
+      // Delete from killer games
+      final List<String> killerGamesRaw = prefs.getStringList('killer_game_history') ?? [];
+      final rawIdx = killerGamesRaw.indexWhere((raw) {
+        final game = jsonDecode(raw);
+        return game['id'] == gameToDelete.id;
+      });
+      
+      if (rawIdx >= 0) {
+        killerGamesRaw.removeAt(rawIdx);
+        await prefs.setStringList('killer_game_history', killerGamesRaw);
+      }
     } else {
       // Delete from traditional games
       final List<String> traditionalGamesRaw = prefs.getStringList('games_history') ?? [];
@@ -206,10 +219,14 @@ class _GameHistoryViewState extends State<GameHistoryView> {
   }
 
   void _showGameDetailsDialog(UnifiedGameHistory game) {
-    if (game.gameType != GameType.cricket) {
-      _showTraditionalGameDetails(game.traditionalGame!);
-    } else {
+    if (game.gameType == GameType.cricket) {
       _showCricketGameDetails(game.cricketGame!);
+    } else if (game.gameType == GameType.donkey) {
+      _showDonkeyGameDetails(game.donkeyGame!);
+    } else if (game.gameType == GameType.killer) {
+      _showKillerGameDetails(game.killerGame!);
+    } else {
+      _showTraditionalGameDetails(game.traditionalGame!);
     }
   }
 
@@ -466,6 +483,202 @@ class _GameHistoryViewState extends State<GameHistoryView> {
     );
   }
 
+  void _showDonkeyGameDetails(dynamic donkeyGame) {
+    final wasCompleted = donkeyGame.completedAt != null;
+    
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: wasCompleted 
+                ? Colors.green.shade100 
+                : Colors.orange.shade100,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Donkey Game',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Chip(
+                    label: Text(
+                      wasCompleted ? 'Completed' : 'In Progress',
+                      style: TextStyle(
+                        color: wasCompleted ? Colors.green.shade900 : Colors.orange.shade900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    backgroundColor: wasCompleted 
+                        ? Colors.green.shade50 
+                        : Colors.orange.shade50,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Players: ${donkeyGame.originalPlayers.join(", ")}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              if (wasCompleted && donkeyGame.eliminatedPlayers != null && donkeyGame.eliminatedPlayers!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Winner: ${donkeyGame.originalPlayers.firstWhere((p) => !donkeyGame.eliminatedPlayers!.contains(p), orElse: () => 'Unknown')}',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        content: const SizedBox(
+          width: double.maxFinite,
+          height: 100,
+          child: Center(
+            child: Text('Donkey game details not fully implemented yet'),
+          ),
+        ),
+        actions: [
+          if (!wasCompleted)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Continue Game'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resumeGame(UnifiedGameHistory.fromDonkey(donkeyGame));
+              },
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showKillerGameDetails(dynamic killerGame) {
+    final wasCompleted = killerGame.isGameComplete;
+    
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: wasCompleted 
+                ? Colors.green.shade100 
+                : Colors.orange.shade100,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Killer Game',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Chip(
+                    label: Text(
+                      wasCompleted ? 'Completed' : 'In Progress',
+                      style: TextStyle(
+                        color: wasCompleted ? Colors.green.shade900 : Colors.orange.shade900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    backgroundColor: wasCompleted 
+                        ? Colors.green.shade50 
+                        : Colors.orange.shade50,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Players: ${killerGame.players.map((p) => p.name).join(", ")}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              if (wasCompleted && killerGame.winner != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.emoji_events, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Winner: ${killerGame.winner}',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        content: const SizedBox(
+          width: double.maxFinite,
+          height: 100,
+          child: Center(
+            child: Text('Killer game details not fully implemented yet'),
+          ),
+        ),
+        actions: [
+          if (!wasCompleted)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Continue Game'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resumeGame(UnifiedGameHistory.fromKiller(killerGame));
+              },
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _resumeGame(UnifiedGameHistory game) {
     if (game.gameType == GameType.cricket) {
       Navigator.of(context).push(
@@ -485,6 +698,15 @@ class _GameHistoryViewState extends State<GameHistoryView> {
             gameHistory: game.donkeyGame,
             randomOrder: false, // Default for resumed games
             variant: game.donkeyGame!.variant,
+          ),
+        ),
+      );
+    } else if (game.gameType == GameType.killer) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => KillerGameScreen(
+            playerNames: game.players,
+            randomOrder: false, // Default for resumed games
           ),
         ),
       );

@@ -466,6 +466,7 @@ class _KillerGameScreenState extends State<KillerGameScreen> {
             GameOverlayAnimation(
               overlayType: _overlayType ?? GameOverlayType.killerTurnChange,
               playerName: _overlayPlayerName,
+              nextPlayerName: _overlayType == GameOverlayType.killerTurnChange ? _overlayPlayerName : '',
               isVisible: _showOverlay,
               onAnimationComplete: () {
                 setState(() {

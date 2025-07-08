@@ -233,6 +233,9 @@ class TraditionalGameController extends ChangeNotifier {  /// Constructor: initi
 
   /// Main scoring method: apply a throw with value and optional label
   Future<void> score(int totalScore, [String? label]) async {
+    // Prevent scoring during turn changes
+    if (isTurnChanging) return;
+    
     // Play sound and give haptic feedback
     _playDartSound();
     
@@ -454,6 +457,24 @@ class TraditionalGameController extends ChangeNotifier {  /// Constructor: initi
     notifyListeners();
   }
 
+  /// Dismiss any visible overlays and complete pending turn changes immediately
+  void dismissOverlays() {
+    // Cancel any pending timers
+    _bustTimer?.cancel();
+    _turnChangeTimer?.cancel();
+    
+    // Clear overlay flags
+    showBust = false;
+    showTurnChange = false;
+    
+    // If a turn change was in progress, complete it immediately
+    if (isTurnChanging) {
+      _completeTurnChange();
+    } else {
+      notifyListeners();
+    }
+  }
+
   /// Undo the most recent throw, but if the player hasn't thrown any darts
   /// this turn (dartsThrown == 0), first revert the turn to the previous player.
   Future<void> undoLastThrow() async {
@@ -517,13 +538,12 @@ class TraditionalGameController extends ChangeNotifier {  /// Constructor: initi
     // Cancel any existing timer
     _turnChangeTimer?.cancel();
     
+    // Set flag to prevent scoring during turn change
+    isTurnChanging = true;
+    
     // If animations are disabled, change turns immediately
     if (_turnChangeDuration == Duration.zero) {
-      currentPlayer = _findNextActivePlayer(currentPlayer);
-      dartsThrown = 0;
-      currentGame.modifiedAt = DateTime.now();
-      _debouncedSaveHistory();
-      notifyListeners();
+      _completeTurnChange();
       return;
     }
     
@@ -532,16 +552,22 @@ class TraditionalGameController extends ChangeNotifier {  /// Constructor: initi
     
     // Clear flash and update player after delay
     _turnChangeTimer = Timer(_turnChangeDuration, () {
-      showTurnChange = false;
-      currentPlayer = _findNextActivePlayer(currentPlayer);
-      dartsThrown = 0;
-      
-      // Save after the turn change completes
-      currentGame.modifiedAt = DateTime.now();
-      _debouncedSaveHistory();
-      
-      notifyListeners();
+      _completeTurnChange();
     });
+  }
+
+  /// Complete the turn change by updating the current player and resetting flags
+  void _completeTurnChange() {
+    showTurnChange = false;
+    isTurnChanging = false;
+    currentPlayer = _findNextActivePlayer(currentPlayer);
+    dartsThrown = 0;
+    
+    // Save after the turn change completes
+    currentGame.modifiedAt = DateTime.now();
+    _debouncedSaveHistory();
+    
+    notifyListeners();
   }  /// Debounced history saving to reduce frequency of writes
   void _debouncedSaveHistory() {
     _saveTimer?.cancel();

@@ -6,10 +6,10 @@ import 'package:dars_scoring_app/services/traditional_game_service.dart';
 class DartIconsRow extends StatelessWidget {
 
   const DartIconsRow({
-    Key? key,
+    super.key,
     required this.ctrl,
     this.iconSize = 32,
-  }) : super(key: key);
+  });
   final TraditionalGameController ctrl;
   final double iconSize;
 

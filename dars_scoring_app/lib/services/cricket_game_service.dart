@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,6 +115,9 @@ class CricketGameController extends ChangeNotifier {  /// Constructor
 
   /// Score a miss (no points, just advance the turn)
   Future<void> scoreMiss() async {
+    // Prevent scoring during turn changes
+    if (isTurnChanging) return;
+    
     // Play sound and give haptic feedback
     _playDartSound();
     
@@ -195,6 +197,9 @@ class CricketGameController extends ChangeNotifier {  /// Constructor
     notifyListeners();
   }  /// Main scoring method: apply a throw value (15-20, 25)
   Future<void> score(int value) async {
+    // Prevent scoring during turn changes
+    if (isTurnChanging) return;
+    
     // Only allow numbers valid for this variant
     if (!cricketNumbersForVariant.contains(value)) return;
     
@@ -286,6 +291,22 @@ class CricketGameController extends ChangeNotifier {  /// Constructor
     notifyListeners();
   }
 
+  /// Dismiss any visible overlays and complete pending turn changes immediately
+  void dismissOverlays() {
+    // Cancel any pending timers
+    _turnChangeTimer?.cancel();
+    
+    // Clear overlay flags
+    showTurnChange = false;
+    
+    // If a turn change was in progress, complete it immediately
+    if (isTurnChanging) {
+      _completeTurnChange();
+    } else {
+      notifyListeners();
+    }
+  }
+
   /// Undo the most recent throw
   Future<void> undoLastThrow() async {
     if (currentGame.throws.isEmpty) return;
@@ -362,19 +383,29 @@ class CricketGameController extends ChangeNotifier {  /// Constructor
   void _advanceTurn() {
     _turnChangeTimer?.cancel();
     
+    // Set flag to prevent scoring during turn change
+    isTurnChanging = true;
     showTurnChange = true;
-    notifyListeners();    _turnChangeTimer = Timer(_turnChangeDuration, () {
-      showTurnChange = false;
-      currentPlayer = (currentPlayer + 1) % players.length;
-      dartsThrown = 0;
-      
-      // Update the current player in the game history and save
-      currentGame.currentPlayer = currentPlayer;
-      currentGame.dartsThrown = dartsThrown;
-      _debouncedSave();
-      
-      notifyListeners();
+    notifyListeners();
+
+    _turnChangeTimer = Timer(_turnChangeDuration, () {
+      _completeTurnChange();
     });
+  }
+
+  /// Complete the turn change by updating the current player and resetting flags
+  void _completeTurnChange() {
+    showTurnChange = false;
+    isTurnChanging = false;
+    currentPlayer = (currentPlayer + 1) % players.length;
+    dartsThrown = 0;
+    
+    // Update the current player in the game history and save
+    currentGame.currentPlayer = currentPlayer;
+    currentGame.dartsThrown = dartsThrown;
+    _debouncedSave();
+    
+    notifyListeners();
   }  /// Play dart sound
   void _playDartSound() {
     HapticFeedback.mediumImpact();
