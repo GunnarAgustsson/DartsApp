@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dars_scoring_app/services/traditional_game_service.dart';
 import 'package:dars_scoring_app/services/checkout_service.dart';
-import 'package:dars_scoring_app/data/possible_finishes.dart';
 
 /// Displays the best finish options based on the remaining score and darts.
 class PossibleFinishHint extends StatelessWidget {

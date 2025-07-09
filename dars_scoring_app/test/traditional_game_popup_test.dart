@@ -9,7 +9,7 @@ void main() {
     testWidgets('Quick score, dismiss popup, score again without waiting for animation', (WidgetTester tester) async {
       // Create a traditional game with slow animation duration to test the issue
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: GameScreen(
             startingScore: 501,
             players: ['Player 1', 'Player 2'],
@@ -120,7 +120,7 @@ void main() {
     testWidgets('Verify turn change happens before overlay shows', (WidgetTester tester) async {
       // This test will help us understand the timing of turn changes vs overlay display
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: GameScreen(
             startingScore: 501,
             players: ['Alice', 'Bob'],
